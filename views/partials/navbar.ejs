@@ -42,7 +42,7 @@
     <div class="collapse navbar-collapse justify-content-end" id="collapsibleNavbar">
         <ul class="navbar-nav">
             
-            <% if (user && user.role === "admin") { %>
+            <% if (user && (user.role === "admin" || user.role === "user")) { %>
                 <li class="nav-item">
                     <a class="nav-link" href="/dashboard">Dashboard</a>
                 </li>
