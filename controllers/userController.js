@@ -150,8 +150,8 @@ exports.signin = async (req, res) => {
     let redirectPath = "/dashboard";
 
     if (user.role === "compliance") {
-      // make sure your route matches this path (e.g. /audit-log vs /auditLog)
-      redirectPath = "/audit-log";
+      // route is auditLog bruh
+      redirectPath = "/auditLog";
     } else if (user.role === "admin") {
       redirectPath = "/dashboard";
     } 
