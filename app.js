@@ -162,6 +162,11 @@ app.use("/admin", adminRouter);
 
 // Deliveries (admin only)
 app.use('/deliveries', authMiddleware, adminMiddleware, deliveryRouter);
+app.post('/wip', async (req, res) => {
+  return res.status(403).render('wip', {
+    message: "This feature is still under development."
+  });
+});
 
 // Exceptions (admin only)
 app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
@@ -169,15 +174,15 @@ app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
 
 
 
-// Compliance ONLY access to audit logs
+// Compliance, admin, operations ONLY access to audit logs
 app.use(
   '/',
   authMiddleware,
   (req, res, next) => {
-    if (req.user && req.user.role === 'compliance') {
+    if (req.user && req.user.role === 'compliance' , 'admin' , 'operations') {
       return next();
     }
-    return res.status(403).send('Access denied. Compliance only.');
+    return res.status(403).send('Access denied. Compliance, admin, and operations only.');
   },
   auditRouter
 );
