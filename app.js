@@ -26,6 +26,15 @@ const MONGO_URI = process.env.MONGODB_URI;
 
 // -------------------- CORE MIDDLEWARE --------------------
 
+const { maskCard, maskAddress } = require('./utils/mask');
+
+// Make helpers available in ALL EJS views
+app.use((req, res, next) => {
+  res.locals.maskCard = maskCard;
+  res.locals.maskAddress = maskAddress;
+  next();
+});
+
 // Parse form data & JSON
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());

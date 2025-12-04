@@ -184,20 +184,20 @@
                             onclick="window.location='/deliveries'">
 
                             <td>
-                                <% 
-                                    const rawCard = d.card_number || "";
-                                    function maskCard(card) {
-                                        if (!card) return "-";
-                                        const clean = card.replace(/\s+/g, "");
-                                        const last4 = clean.slice(-4);
-                                        return "**** **** **** " + last4;
-                                    }
-                                %>
-
                                 <% if (user && user.role === "admin") { %>
-                                    <%= rawCard %>
+                                    <%= d.card_number %>   <!-- Admin sees full card number -->
                                 <% } else { %>
-                                    <%= maskCard(rawCard) %>
+                                    <%= maskCard(d.card_number) %>  <!-- Others see masked card -->
+                                <% } %>
+                            </td>
+
+                            <td><%= d.recipient_name %></td>
+
+                            <td>
+                                <% if (user && user.role === "admin") { %>
+                                    <%= d.address %>   <!-- Admin sees full address -->
+                                <% } else { %>
+                                    <%= maskAddress(d.address) %>  <!-- Others see masked address -->
                                 <% } %>
                             </td>
 
