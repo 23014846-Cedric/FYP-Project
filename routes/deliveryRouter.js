@@ -7,11 +7,19 @@ const AuditLog = require('../models/AuditLog');
 
 const multer = require('multer');
 const xlsx = require('xlsx');
+const { body, validationResult } = require('express-validator');
 
 // Multer: temporary upload folder
 const upload = multer({ dest: 'uploads/' });
 
 console.log('[deliveryRouter] loaded');
+
+// Helper: mask card for logs (PDPA – only last 4 digits)
+function last4(card) {
+  if (!card) return '****';
+  const clean = String(card).replace(/\s+/g, '');
+  return clean.slice(-4);
+}
 
 // Inline helper: write an audit log entry
 async function addAuditLog(req, {
@@ -48,6 +56,27 @@ async function addAuditLog(req, {
   }
 }
 
+// Reusable validation rules for a single delivery (FR24)
+const deliveryValidationRules = [
+  body('card_number')
+    .trim()
+    .matches(/^\d{16}$/).withMessage('Card number must be 16 digits'),
+  body('recipient_name')
+    .trim()
+    .notEmpty().withMessage('Recipient name is required')
+    .isLength({ max: 100 }).withMessage('Recipient name too long'),
+  body('address')
+    .trim()
+    .notEmpty().withMessage('Address is required'),
+  body('courier')
+    .optional({ checkFalsy: true })
+    .isLength({ max: 50 }).withMessage('Courier name too long'),
+  body('status')
+    .optional()
+    .isIn(['Pending', 'Shipped', 'Delivered', 'Failed'])
+    .withMessage('Invalid status value')
+];
+
 /**
  * GET /deliveries
  * Show all deliveries in the table
@@ -70,43 +99,74 @@ router.get('/', async (req, res) => {
 
 /**
  * POST /deliveries
- * (Optional manual create – you can keep or ignore this form)
+ * Manual create – now with validation (FR24)
  */
-router.post('/', async (req, res) => {
-  try {
-    const { card_number, recipient_name, address, courier } = req.body;
+router.post(
+  '/',
+  deliveryValidationRules,
+  async (req, res) => {
+    const errors = validationResult(req);
 
-    const created = await CardDelivery.create({
-      card_number,
-      recipient_name,
-      address,
-      courier,
-      status: 'Pending',
-      updated_at: new Date(),
-    });
+    if (!errors.isEmpty()) {
+      console.warn('[Create Delivery] Validation failed:', errors.array());
 
-    // Audit: track creation
-    await addAuditLog(req, {
-      action_type: "CREATE_DELIVERY",
-      entity_type: "CardDelivery",
-      entity_id: created._id.toString(),
-      field: null,
-      old_value: null,
-      new_value: null,
-      source: "Deliveries Page",
-      remarks: `Created delivery for card ${card_number}`,
-    });
+      // If you have a "create delivery" form view, you can render it with errors.
+      // For now, send a simple 400 with error messages.
+      return res.status(400).send(
+        'Validation error: ' + errors.array().map(e => e.msg).join(', ')
+      );
+    }
 
-    res.redirect('/deliveries');
-  } catch (err) {
-    console.error('Error creating delivery:', err);
-    res.status(500).send('Error creating delivery');
+    try {
+      const { card_number, recipient_name, address, courier } = req.body;
+
+      const created = await CardDelivery.create({
+        card_number,
+        recipient_name,
+        address,
+        courier,
+        status: 'Pending',
+        updated_at: new Date(),
+      });
+
+      // Audit: track creation (mask card in logs – PDPA)
+      await addAuditLog(req, {
+        action_type: "CREATE_DELIVERY",
+        entity_type: "CardDelivery",
+        entity_id: created._id.toString(),
+        field: null,
+        old_value: null,
+        new_value: null,
+        source: "Deliveries Page",
+        remarks: `Created delivery for card **** **** **** ${last4(card_number)}`,
+      });
+
+      res.redirect('/deliveries');
+    } catch (err) {
+      console.error('Error creating delivery:', err);
+      res.status(500).send('Error creating delivery');
+    }
   }
-});
+);
+
+/**
+ * Helper: basic validation for Excel row (FR24 for import)
+ */
+function validateExcelRow(row) {
+  const card = row['Card #'];
+  const recipient = row['Recipient'];
+  const address = row['Address'];
+
+  if (!card || !recipient || !address) return false;
+  const cleanCard = String(card).replace(/\s+/g, '');
+  if (!/^\d{16}$/.test(cleanCard)) return false;
+
+  return true;
+}
 
 /**
  * POST /deliveries/import
- * Import deliveries from Excel
+ * Import deliveries from Excel (with basic validation & PDPA-safe logs)
  */
 router.post('/import', upload.single('excel_file'), async (req, res) => {
   try {
@@ -121,26 +181,32 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
 
     console.log('[Import] Raw rows from Excel:', rows);
 
-    const docs = rows
-      .map(row => {
-        const rawStatus = row['Status'];
+    const docs = [];
+    let invalidCount = 0;
 
-        // Normalise status (Excel has "In Transit", DB uses "Shipped")
-        let status = 'Pending';
-        if (rawStatus === 'Delivered') status = 'Delivered';
-        else if (rawStatus === 'In Transit') status = 'Shipped';
-        else if (['Pending', 'Shipped', 'Failed'].includes(rawStatus)) status = rawStatus;
+    for (const row of rows) {
+      if (!validateExcelRow(row)) {
+        invalidCount++;
+        continue;
+      }
 
-        return {
-          card_number: row['Card #'],
-          recipient_name: row['Recipient'],
-          address: row['Address'],
-          courier: row['Courier'] || '-',
-          status,
-          updated_at: new Date(),   // just use "now"
-        };
-      })
-      .filter(d => d.card_number && d.recipient_name && d.address);
+      const rawStatus = row['Status'];
+
+      // Normalise status (Excel has "In Transit", DB uses "Shipped")
+      let status = 'Pending';
+      if (rawStatus === 'Delivered') status = 'Delivered';
+      else if (rawStatus === 'In Transit') status = 'Shipped';
+      else if (['Pending', 'Shipped', 'Failed'].includes(rawStatus)) status = rawStatus;
+
+      docs.push({
+        card_number: String(row['Card #']).replace(/\s+/g, ''),
+        recipient_name: row['Recipient'],
+        address: row['Address'],
+        courier: row['Courier'] || '-',
+        status,
+        updated_at: new Date(),   // just use "now"
+      });
+    }
 
     if (docs.length === 0) {
       console.warn('[Import] No valid rows found in file');
@@ -148,9 +214,9 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
     }
 
     const result = await CardDelivery.insertMany(docs);
-    console.log(`[Import] Successfully inserted ${result.length} deliveries`);
+    console.log(`[Import] Successfully inserted ${result.length} deliveries. Invalid rows: ${invalidCount}`);
 
-    // Audit: log bulk import
+    // Audit: log bulk import (no raw card numbers)
     await addAuditLog(req, {
       action_type: "IMPORT_DELIVERIES",
       entity_type: "CardDelivery",
@@ -159,7 +225,7 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
       old_value: null,
       new_value: null,
       source: "Deliveries Import",
-      remarks: `Imported ${result.length} deliveries from Excel`,
+      remarks: `Imported ${result.length} deliveries from Excel. Skipped ${invalidCount} invalid rows.`,
     });
 
     res.redirect('/deliveries');
@@ -177,6 +243,12 @@ router.post('/:id/status', async (req, res) => {
   try {
     const deliveryId = req.params.id;
     const { new_status } = req.body;
+
+    // Optional: validate status here as well
+    const allowedStatuses = ['Pending', 'Shipped', 'Delivered', 'Failed'];
+    if (!allowedStatuses.includes(new_status)) {
+      return res.status(400).send('Invalid status');
+    }
 
     // Get the existing delivery to capture old status
     const existing = await CardDelivery.findById(deliveryId).lean();
