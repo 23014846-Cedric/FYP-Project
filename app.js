@@ -119,7 +119,6 @@ app.get('/',        (req, res) => res.redirect('/login'));
 app.get('/login',   (req, res) => res.render('login',   { errors: [] }));
 app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: {} }));
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
-app.get('/contact', (req, res) => res.render('contact', { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
 app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'operations') {
@@ -189,6 +188,7 @@ app.use('/', authRouter);
 
 // Contact (e.g. POST /contact)
 app.use('/', contactRouter);
+app.use('/contact', contactRouter);
 
 // Operations routes (operations team only)
 app.use("/operations", operationsRouter);
