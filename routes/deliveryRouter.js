@@ -277,5 +277,7 @@ router.post('/:id/status', async (req, res) => {
     res.status(500).send('Error updating delivery status');
   }
 });
-
+router.post('/wip', async (req, res) => {
+  return res.status(403).render('wip');
+});
 module.exports = router;
