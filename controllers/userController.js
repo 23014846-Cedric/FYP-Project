@@ -3,6 +3,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const AuditLog = require('../models/AuditLog');
 
 const SALT = 10;
 
@@ -117,6 +118,16 @@ exports.signin = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
+    await AuditLog.create({
+      username: user.name,
+      user_id: user._id,
+      action_type: "LOGIN",
+      entity_type: "User",
+      entity_id: user._id,
+      source: "Web",
+      remarks: "User logged in"
+    });
+
     res.redirect("/dashboard"); // change to your dashboard route
   } catch (err) {
     console.error(err);
@@ -127,9 +138,58 @@ exports.signin = async (req, res) => {
 // ========== LOGOUT ==========
 
 // GET: handle logout
-exports.logout = (req, res) => {
+exports.logout = async(req, res) => {
   res.clearCookie("token");
+  if (req.user) {
+    await AuditLog.create({
+      username: req.user.name,
+      user_id: req.user._id,
+      action_type: "LOGOUT",
+      entity_type: "User",
+      entity_id: req.user._id,
+      source: "Web",
+      remarks: "User logged out"
+    });
+  }
   res.redirect("/login");
 };
 
+// ========== UPDATE USER ROLE (Admin Only) ==========
+exports.updateUserRole = async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).send("Access denied. Admins only.");
+    }
+    
+    const { userId, newRole } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    const oldRole = user.role;
+    user.role = newRole;
+    await user.save();
+
+    // ADDED: Log role update
+    await AuditLog.create({
+      username: req.user.name,
+      user_id: req.user._id,
+      action_type: "ROLE_UPDATE",
+      entity_type: "User",
+      entity_id: user._id,
+      field: "role",
+      old_value: oldRole,
+      new_value: newRole,
+      source: "Web",
+      remarks: "Admin changed user role"
+    });
+
+    res.redirect("/admin/users");
+  } catch (err) {
+    console.error("Error updating role:", err);
+    res.status(500).send("Error updating role");
+  }
+};
 // (no module.exports override – we only use exports.<name>)

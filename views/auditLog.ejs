@@ -7,6 +7,15 @@
 </head>
 <body class="p-4">
   <%- include("partials/navbar") %>
+  <%
+  function getRowColor(action) {
+    if (action === "UPDATE_STATUS") return "table-success"; // green
+    if (action === "LOGIN" || action === "LOGOUT") return "table-warning"; // yellow
+    if (action === "ROLE_UPDATE" || action === "IMPORT_DELIVERIES") return "table-danger"; // red
+    return "";
+  }
+%>
+
   <div class="sidebar-hover-zone"></div>
   <%- include("partials/sidebar") %>
     
@@ -14,6 +23,7 @@
     <h1>System Activity Log</h1>
   </div>
 
+  <button id="exportExcel" class="btn btn-success mb-3">Export to Excel</button>
   <table class="table table-bordered table-striped table-sm align-middle">
     <thead class="table-dark">
       <tr>
@@ -30,7 +40,7 @@
     <tbody>
       <% if (logs && logs.length > 0) { %>
         <% logs.forEach(log => { %>
-          <tr>
+          <tr class="<%= getRowColor(log.action_type) %>">
             <!-- Time -->
             <td>
               <% if (log.timestamp) { %>
@@ -102,4 +112,13 @@
     </div>
   </footer>
 </body>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<script>
+document.getElementById("exportExcel").addEventListener("click", () => {
+    const table = document.querySelector("table");
+    const wb = XLSX.utils.table_to_book(table, { sheet: "Audit Logs" });
+    XLSX.writeFile(wb, "audit_logs.xlsx");
+});
+</script>
 </html>
