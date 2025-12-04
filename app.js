@@ -196,7 +196,7 @@ app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
 
 // Compliance ONLY access to audit logs
 app.use(
-  '/auditLog',
+  '/',
   authMiddleware,
   (req, res, next) => {
     if (req.user && req.user.role === 'compliance') {
