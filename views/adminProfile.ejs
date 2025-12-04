@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin - User Management</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <%- include("partials/navbar") %>
+
+  <div class="container">
+    <h1>Admin Panel - User List</h1>
+
+    <p>Logged in as: <strong><%= user.name %></strong> (<%= user.role %>)</p>
+
+    <table border="1" cellpadding="10" cellspacing="0">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>User ID</th>
+        </tr>
+      </thead>
+
+      <tbody>
+      <% users.forEach((u) => { %>
+        <tr>
+          <td><%= u.name %></td>
+          <td><%= u.email %></td>
+          <td><%= u.role %></td>
+          <td><%= u._id %></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+
+    <br>
+    <a href="/dashboard">Back to Dashboard</a>
+  </div>
+
+</body>
+</html>

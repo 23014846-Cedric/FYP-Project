@@ -18,6 +18,7 @@ const authRouter      = require('./routes/authRouter');
 const deliveryRouter  = require('./routes/deliveryRouter');
 const exceptionRouter = require('./routes/exceptionRouter');
 const operationsRouter = require("./routes/operationsRouter");
+const adminRouter = require("./routes/adminRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -186,6 +187,7 @@ app.use('/', contactRouter);
 app.use("/operations", operationsRouter);
 
 // Admin-only modules
+app.use("/admin", adminRouter);
 
 // Deliveries (admin only)
 app.use('/deliveries', authMiddleware, adminMiddleware, deliveryRouter);
