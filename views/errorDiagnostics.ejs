@@ -38,7 +38,7 @@
           <% } else { %>
             <% logs.forEach(log => { %>
               <tr>
-                <td><%= new Date(log.createdAt).toLocaleString() %></td>
+                <td><%= new Date(log.createdAt || log.timestamp).toLocaleString() %></td>
                 <td>
                   <span class="badge bg-danger"><%= log.statusCode || 500 %></span>
                 </td>

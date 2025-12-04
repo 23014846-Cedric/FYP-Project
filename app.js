@@ -122,15 +122,23 @@ app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: 
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
 app.get('/contact', (req, res) => res.render('contact', { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
-app.get('/errorDiagnostics', authMiddleware, (req, res) => {
+app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'operations') {
     return res.status(403).render('403', {
       message: 'You do not have permission to access this page.'
     });
   }
 
-  // TODO: pull error logs / structured errors here later
-  res.render('errorDiagnostics');
+  try {
+    const logs = await ErrorLog.find()
+      .sort({ createdAt: -1 })   // or timestamp, see note below
+      .lean();
+
+    res.render('errorDiagnostics', { logs });
+  } catch (err) {
+    console.error('Error loading error diagnostics:', err);
+    res.render('errorDiagnostics', { logs: [] });
+  }
 });
 
 // Protected dashboard (any logged-in user)
