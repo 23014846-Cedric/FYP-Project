@@ -111,6 +111,15 @@ function adminMiddleware(req, res, next) {
   return res.status(403).send('Access denied. Admins only.');
 }
 
+// Simple compliance-only middleware
+function complianceMiddleware(req, res, next) {
+  if (req.user && req.user.role === 'compliance') {
+    return next();
+  }
+  return res.status(403).send('Access denied. Compliance only.');
+}
+
+
 // -------------------- PAGE ROUTES --------------------
 
 // Public pages
@@ -192,9 +201,19 @@ app.use('/deliveries', authMiddleware, adminMiddleware, deliveryRouter);
 // Exceptions (admin only)
 app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
 
-// Audit log routes (admin only)
-// auditRouter itself defines routes like GET /auditLog, so we mount at '/'
-app.use('/', authMiddleware, adminMiddleware, auditRouter);
+
+// Compliance ONLY access to audit logs
+app.use(
+  '/auditLog',
+  authMiddleware,
+  (req, res, next) => {
+    if (req.user && req.user.role === 'compliance') {
+      return next();
+    }
+    return res.status(403).send('Access denied. Compliance only.');
+  },
+  auditRouter
+);
 
 // -------------------- DATABASE & SERVER --------------------
 
