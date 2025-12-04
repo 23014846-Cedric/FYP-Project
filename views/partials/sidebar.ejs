@@ -53,7 +53,7 @@
             opacity: 0.85;
         }
     </style>
-<<<<<<< HEAD
+
         <ul>
             <% if (user && user.role === "admin") { %>
                 <!-- ADMIN MENU -->
@@ -88,6 +88,21 @@
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>
 
+            <% } else if (user && user.role === "operations") { %>
+            <!-- OPERATIONS MENU -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/profile">Profile</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/deliveries">Deliveries</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/error-diagnostics">Error Diagnostics</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+                </li>            
+
             <% } else { %>
                 <!-- GUEST MENU -->
                 <li class="nav-item">
@@ -101,60 +116,4 @@
 
         </ul>
     </div>
-=======
 
-    <ul>
-        <% if (user && user.role === "admin") { %>
-            <!-- ADMIN MENU -->
-            <li class="nav-item">
-                <a class="nav-link" href="/profile">Profile</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/exceptions">Exceptions</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/auditLog">Audit Trail</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/deliveries">Deliveries</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-            </li>
-
-        <% } else if (user && user.role === "operations") { %>
-            <!-- OPERATIONS MENU -->
-            <li class="nav-item">
-                <a class="nav-link" href="/profile">Profile</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/deliveries">Deliveries</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="/error-diagnostics">Error Diagnostics</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-            </li>
-            
-        <% } else if (user) { %>
-            <!-- NORMAL LOGGED-IN USER MENU -->
-            <li class="nav-item">
-                <a class="nav-link" href="/profile">Profile</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-            </li>
-
-        <% } else { %>
-            <!-- GUEST MENU -->
-            <li class="nav-item">
-                <a class="nav-link" href="/login">Login</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-primary fw-bold" href="/signup">Register</a>
-            </li>
-        <% } %>
-    </ul>
-</div>
->>>>>>> 2242755b7a3f148bfe7c77a8ea8952da2e4d002d
