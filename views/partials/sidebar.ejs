@@ -55,7 +55,7 @@
     </style>
 
         <ul>
-            <% if (user && (user.role === "admin" || user.role === "operations")) { %>
+            <% if (user && (user.role === "admin" )) { %>
                 <!-- ADMIN MENU -->
                 <li class="nav-item">
                     <a class="nav-link" href="/profile">Profile</a>
@@ -79,14 +79,6 @@
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>
 
-            <% } else if (user) { %>
-                <!-- NORMAL LOGGED-IN USER MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>
 
             <% } else if (user && user.role === "operations") { %>
             <!-- OPERATIONS MENU -->
@@ -101,7 +93,16 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>            
+                </li>      
+                
+            <% } else if (user) { %>
+                <!-- NORMAL LOGGED-IN USER MENU -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/profile">Profile</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+                </li>               
 
             <% } else { %>
                 <!-- GUEST MENU -->
