@@ -2,13 +2,23 @@
 <html>
 <head>
   <title>Admin - User Management</title>
-  <link rel="stylesheet" href="/css/style.css">
+
+  <style>
+    /* Push content to the right so it doesn't hide under sidebar */
+    .content-container {
+      margin-left: 240px;    /* enough space for 200px sidebar + hover zone */
+      padding: 20px;
+    }
+  </style>
+
 </head>
 <body>
+    <%- include("partials/navbar") %>
+    <div class="sidebar-hover-zone"></div>
+    <%- include("partials/sidebar") %>
 
-  <%- include("partials/navbar") %>
-
-  <div class="container">
+  <!-- Use NEW class instead of plain .container -->
+  <div class="content-container">
     <h1>Admin Panel - User List</h1>
 
     <p>Logged in as: <strong><%= user.name %></strong> (<%= user.role %>)</p>
@@ -39,5 +49,6 @@
     <a href="/dashboard">Back to Dashboard</a>
   </div>
 
+  <%- include("partials/footer") %>
 </body>
 </html>
