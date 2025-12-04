@@ -129,7 +129,7 @@ app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: 
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
 app.get('/contact', (req, res) => res.render('contact', { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
-app.get('/error-diagnostics', authMiddleware, (req, res) => {
+app.get('/errorDiagnostics', authMiddleware, (req, res) => {
   if (!req.user || req.user.role !== 'operations') {
     return res.status(403).render('403', {
       message: 'You do not have permission to access this page.'
@@ -147,7 +147,7 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
     let deliveries;
 
     // If admin -> see everything
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'operations')) {
       deliveries = await CardDelivery.find().lean();
     } else {
       // Normal user -> only see their own deliveries
