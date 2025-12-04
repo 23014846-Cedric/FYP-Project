@@ -169,15 +169,15 @@ app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
 
 
 
-// Compliance ONLY access to audit logs
+// Compliance, admin, operations ONLY access to audit logs
 app.use(
   '/',
   authMiddleware,
   (req, res, next) => {
-    if (req.user && req.user.role === 'compliance') {
+    if (req.user && req.user.role === 'compliance' , 'admin' , 'operations') {
       return next();
     }
-    return res.status(403).send('Access denied. Compliance only.');
+    return res.status(403).send('Access denied. Compliance, admin, and operations only.');
   },
   auditRouter
 );
