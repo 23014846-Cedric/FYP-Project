@@ -22,13 +22,15 @@ const auditLogSchema = new mongoose.Schema({
   },
 
   entity_type: {
-    type: String,          // e.g. "CardDelivery"
+    type: String,          // e.g. "CardDelivery", "User"
+    // keep required if you want, or relax it too:
     required: true,
   },
 
   entity_id: {
     type: String,
-    required: true,
+    required: false,
+    default: null,
   },
 
   field: {

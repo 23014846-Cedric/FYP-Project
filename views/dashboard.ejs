@@ -184,8 +184,8 @@
                             onclick="window.location='/deliveries'">
 
                             <td>
-                                <% if (user && user.role === "admin") { %>
-                                    <%= d.card_number %>   <!-- Admin sees full card number -->
+                                <% if (user && (user.role === "admin" || user.role === "operations")) { %>
+                                    <%= d.card_number %>   <!-- Admin and Operations sees full card number -->
                                 <% } else { %>
                                     <%= maskCard(d.card_number) %>  <!-- Others see masked card -->
                                 <% } %>
@@ -194,8 +194,8 @@
                             <td><%= d.recipient_name %></td>
 
                             <td>
-                                <% if (user && user.role === "admin") { %>
-                                    <%= d.address %>   <!-- Admin sees full address -->
+                                <% if (user && (user.role === "admin" || user.role === "operations")) { %>
+                                    <%= d.address %>   <!-- Admin and Operations sees full address -->
                                 <% } else { %>
                                     <%= maskAddress(d.address) %>  <!-- Others see masked address -->
                                 <% } %>
@@ -224,7 +224,7 @@
                 </tbody>
             </table>
 
-            <% if (user && user.role === "admin") { %>
+            <% if (user && (user.role === "admin" || user.role === "operations")) { %>
                 <div class="mt-2 text-end">
                     <a href="/deliveries" class="btn btn-sm btn-outline-primary">
                         View All Deliveries

@@ -16,6 +16,8 @@ const auditRouter     = require('./routes/auditRouter');
 const authRouter      = require('./routes/authRouter');
 const deliveryRouter  = require('./routes/deliveryRouter');
 const exceptionRouter = require('./routes/exceptionRouter');
+const operationsRouter = require("./routes/operationsRouter");
+const adminRouter = require("./routes/adminRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -63,13 +65,17 @@ app.use(attachUserFromToken);
 
 // Simple admin-only middleware
 function adminMiddleware(req, res, next) {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && req.user.role === 'admin' || req.user.role === 'operations') {
     return next();
   }
   // you can change this to res.redirect('/dashboard') if you prefer
   return res.status(403).send('Access denied. Admins only.');
 }
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 1e3f07dbd829294dedb489bd1e02142a40dc06d3
 // -------------------- PAGE ROUTES --------------------
 
 // Public pages
@@ -77,8 +83,28 @@ app.get('/',        (req, res) => res.redirect('/login'));
 app.get('/login',   (req, res) => res.render('login',   { errors: [] }));
 app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: {} }));
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
-app.get('/contact', (req, res) => res.render('contact', { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
+<<<<<<< HEAD
+=======
+app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
+  if (!req.user || req.user.role !== 'operations') {
+    return res.status(403).render('403', {
+      message: 'You do not have permission to access this page.'
+    });
+  }
+
+  try {
+    const logs = await ErrorLog.find()
+      .sort({ createdAt: -1 })   // or timestamp, see note below
+      .lean();
+
+    res.render('errorDiagnostics', { logs });
+  } catch (err) {
+    console.error('Error loading error diagnostics:', err);
+    res.render('errorDiagnostics', { logs: [] });
+  }
+});
+>>>>>>> 1e3f07dbd829294dedb489bd1e02142a40dc06d3
 
 // Protected dashboard (any logged-in user)
 // Protected dashboard
@@ -87,7 +113,7 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
     let deliveries;
 
     // If admin -> see everything
-    if (req.user && req.user.role === 'admin') {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'operations')) {
       deliveries = await CardDelivery.find().lean();
     } else {
       // Normal user -> only see their own deliveries
@@ -129,8 +155,13 @@ app.use('/', authRouter);
 
 // Contact (e.g. POST /contact)
 app.use('/', contactRouter);
+app.use('/contact', contactRouter);
+
+// Operations routes (operations team only)
+app.use("/operations", operationsRouter);
 
 // Admin-only modules
+app.use("/admin", adminRouter);
 
 // Deliveries (admin only)
 app.use('/deliveries', authMiddleware, adminMiddleware, deliveryRouter);
@@ -139,6 +170,21 @@ app.use('/deliveries', authMiddleware, adminMiddleware, deliveryRouter);
 app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
 
 
+<<<<<<< HEAD
+=======
+// Compliance ONLY access to audit logs
+app.use(
+  '/',
+  authMiddleware,
+  (req, res, next) => {
+    if (req.user && req.user.role === 'compliance') {
+      return next();
+    }
+    return res.status(403).send('Access denied. Compliance only.');
+  },
+  auditRouter
+);
+>>>>>>> 1e3f07dbd829294dedb489bd1e02142a40dc06d3
 
 // -------------------- DATABASE & SERVER --------------------
 

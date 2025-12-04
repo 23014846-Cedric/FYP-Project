@@ -128,14 +128,14 @@ exports.signin = async (req, res) => {
 
     const token = createToken(user);
 
-    // Store token in cookie (adjust name/options as needed)
+    // Store token in cookie
     res.cookie("token", token, {
       httpOnly: true,
       // secure: true, // enable in production + HTTPS
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-
+    // Log login event
     await AuditLog.create({
       username: user.name,
       user_id: user._id,
@@ -146,24 +146,26 @@ exports.signin = async (req, res) => {
       remarks: "User logged in"
     });
 
-    res.redirect("/dashboard"); // change to your dashboard route
+    // Decide redirect path ONCE based on role
+    let redirectPath = "/dashboard";
 
     if (user.role === "compliance") {
-      return res.redirect("/auditLog");
-    }
+      // route is auditLog bruh
+      redirectPath = "/auditLog";
+    } else if (user.role === "admin") {
+      redirectPath = "/dashboard";
+    } 
+    // You can add operations-specific path if you want:
+    // else if (user.role === "operations") {
+    //   redirectPath = "/operations/dashboard";
+    // }
 
-    if (user.role === "admin") {
-      return res.redirect("/dashboard");
-    }
-
-    // default user behavior
-    return res.redirect("/dashboard");
-    
- // change to your dashboard route
+    // Single redirect
+    return res.redirect(redirectPath);
 
   } catch (err) {
     console.error(err);
-    res.render("login", { errors: ["Something went wrong during login"] });
+    return res.render("login", { errors: ["Something went wrong during login"] });
   }
 };
 

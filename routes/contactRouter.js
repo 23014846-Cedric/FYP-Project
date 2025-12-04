@@ -1,30 +1,82 @@
-// routes/contactRouter.js (or inside your existing router)
-const router = require('express').Router();
+// routes/contactRouter.js
+const express = require("express");
+const router = express.Router();
+const ContactMessage = require("../models/ContactMessage");
+const authMiddleware = require("../middleware/authMiddleware");
 
-router.get('/contact', (req, res) => {
-  res.render('contact', { errors: [], formData: {} });
-});
+// ================== CONTACT FORM (ALL ROLES) ================== //
 
-router.post('/contact', async (req, res) => {
-  const { name, email, company, topic, message } = req.body;
-  const errors = [];
-  const formData = { name, email, company, topic, message };
-
-  if (!name || !email || !message) {
-    errors.push('Name, email and message are required.');
+// GET /contact – show form (any logged-in user)
+router.get(
+  "/",
+  authMiddleware,         // uses your existing auth (checks JWT, sets req.user)
+  (req, res) => {
+    res.render("contact", {
+      errors: [],
+      success: false,
+      formData: {}
+    });
   }
+);
 
-  if (errors.length > 0) {
-    return res.render('contact', { errors, formData });
+// POST /contact – validate + save (any logged-in user)
+router.post(
+  "/",
+  authMiddleware,
+  async (req, res) => {
+    const { name, email, company, topic, message } = req.body;
+    const errors = [];
+
+    if (!name) errors.push("Full name is required.");
+    if (!email) errors.push("Email is required.");
+    if (!message) errors.push("Message is required.");
+
+    if (errors.length > 0) {
+      return res.render("contact", {
+        errors,
+        success: false,
+        formData: req.body
+      });
+    }
+
+    try {
+      await ContactMessage.create({
+        name,
+        email,
+        company,
+        topic,
+        message,
+        createdByIp: req.ip
+        // optionally: createdByUser: req.user.id
+      });
+
+      res.render("contact", {
+        errors: [],
+        success: true,
+        formData: {}
+      });
+    } catch (err) {
+      console.error(err);
+      res.render("contact", {
+        errors: ["Something went wrong. Please try again later."],
+        success: false,
+        formData: req.body
+      });
+    }
   }
+);
 
-  // TODO: send email / save to DB / notify Slack etc.
+// ================== OPERATIONS-ONLY VIEW ================== //
 
-  res.render('contact', {
-    errors: [],
-    formData: {},
-    success: true
-  });
-});
+router.get(
+  "/messages",
+  authMiddleware,                           // must be logged in
+  authMiddleware.requireRole("operations"), // must be operations
+  async (req, res) => {
+    const messages = await ContactMessage.find().sort({ createdAt: -1 }).lean();
+    res.render("contactMessages", { messages });
+  }
+);
+
 
 module.exports = router;

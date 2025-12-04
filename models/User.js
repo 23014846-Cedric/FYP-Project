@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const ALLOWED_ROLES = ['admin', 'user', 'courier', 'compliance'];
+const ALLOWED_ROLES = ['admin', 'user', 'courier', 'compliance', 'operations'];
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
