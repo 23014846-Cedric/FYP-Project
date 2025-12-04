@@ -7,6 +7,9 @@ const cookieParser  = require('cookie-parser');
 const path          = require('path');
 const jwt           = require('jsonwebtoken');
 
+// Utils
+const { maskCard, maskAddress } = require('./utils/mask');
+
 // Models
 const CardDelivery  = require('./models/CardDelivery');
 
@@ -41,6 +44,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 // View engine (EJS)
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+
+// Make mask helpers available globally
+app.use((req, res, next) => {
+  res.locals.maskCard = maskCard;
+  res.locals.maskAddress = maskAddress;
+  next();
+});
 
 // Attach decoded user (if any) to res.locals for all views
 function attachUserFromToken(req, res, next) {
