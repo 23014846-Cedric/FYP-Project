@@ -9,6 +9,7 @@ const jwt           = require('jsonwebtoken');
 
 // Models
 const CardDelivery  = require('./models/CardDelivery');
+const ErrorLog = require('./models/ErrorLog');
 
 // Routers
 const contactRouter   = require('./routes/contactRouter');
@@ -19,6 +20,7 @@ const exceptionRouter = require('./routes/exceptionRouter');
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
+const { requireAuth, requireRole } = require('./middleware/authMiddleware');
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -44,6 +46,35 @@ app.use(cookieParser());
 
 // Static assets
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Global error-handling middleware – MUST be after all routes
+app.use(async (err, req, res, next) => {
+  try {
+    // Basic info
+    const statusCode = err.status || err.statusCode || 500;
+
+    await ErrorLog.create({
+      message: err.message || 'Unknown error',
+      stack: err.stack,
+      statusCode,
+      route: req.originalUrl,
+      method: req.method,
+      userId: req.user?.id || req.user?._id || null,
+      userEmail: req.user?.email || null,
+      userRole: req.user?.role || null,
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
+    });
+  } catch (logErr) {
+    console.error('Failed to log error:', logErr);
+  }
+
+  // For end-users: show friendly error page (no stack leak)
+  res.status(500);
+  res.render('500', {
+    message: 'Something went wrong on our side. Our team has been notified.',
+  });
+});
 
 // View engine (EJS)
 app.set('view engine', 'ejs');
@@ -88,6 +119,16 @@ app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: 
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
 app.get('/contact', (req, res) => res.render('contact', { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
+app.get('/error-diagnostics', authMiddleware, (req, res) => {
+  if (!req.user || req.user.role !== 'operations') {
+    return res.status(403).render('403', {
+      message: 'You do not have permission to access this page.'
+    });
+  }
+
+  // TODO: pull error logs / structured errors here later
+  res.render('errorDiagnostics');
+});
 
 // Protected dashboard (any logged-in user)
 // Protected dashboard
