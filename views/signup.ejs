@@ -233,22 +233,25 @@
                                              3 0 0 0 0 6z"/>
                                 </svg>
                             </span>
-                            <select 
-                                name="role" 
-                                id="role" 
-                                class="form-select"
-                            >
-                                <option 
-                                    value="user" 
-                                    <%= (typeof formData === 'undefined' || formData.role === 'user') ? 'selected' : '' %>
-                                >
+                            <select name="role" id="role" class="form-select">
+                                <option value="user"
+                                    <%= (!formData || formData.role === 'user') ? 'selected' : '' %>>
                                     User
                                 </option>
-                                <option 
-                                    value="admin" 
-                                    <%= (typeof formData !== 'undefined' && formData.role === 'admin') ? 'selected' : '' %>
-                                >
+
+                                <option value="operations"
+                                    <%= (formData && formData.role === 'operations') ? 'selected' : '' %>>
+                                    Operations
+                                </option>
+
+                                <option value="admin"
+                                    <%= (formData && formData.role === 'admin') ? 'selected' : '' %>>
                                     Admin
+                                </option>
+
+                                <option value="compliance"
+                                    <%= (formData && formData.role === 'compliance') ? 'selected' : '' %>>
+                                    Compliance
                                 </option>
                             </select>
                         </div>
@@ -283,6 +286,28 @@
                         </div>
                     </div>
 
+                    <!-- Compliance code field -->
+                    <div class="mb-3" id="complianceCodeBox" style="display:none;">
+                        <label class="form-label" for="complianceCode">Compliance access code</label>
+                        <div class="input-icon-wrapper">
+                            <span class="icon-left">
+                                🔒
+                            </span>
+                            <input 
+                                type="password"
+                                id="complianceCode"
+                                name="complianceCode"
+                                class="form-control"
+                                placeholder="Enter compliance access code"
+                            >
+                        </div>
+
+                        <div class="helper-text mt-1">
+                            Required only if you are registering a <strong>Compliance</strong> account.
+                        </div>
+                    </div>
+
+
                     <button type="submit" class="btn btn-primary w-100 mt-2">
                         Create account
                     </button>
@@ -301,20 +326,16 @@
     <script>
         const roleSelect = document.getElementById('role');
         const adminBox = document.getElementById('adminCodeBox');
+        const complianceBox = document.getElementById('complianceCodeBox');
 
-        function toggleAdminBox() {
-            if (roleSelect.value === 'admin') {
-                adminBox.style.display = 'block';
-            } else {
-                adminBox.style.display = 'none';
-            }
+        function toggleBoxes() {
+            adminBox.style.display = (roleSelect.value === 'admin') ? 'block' : 'none';
+            complianceBox.style.display = (roleSelect.value === 'compliance') ? 'block' : 'none';
         }
 
-        // On load (for when formData.role === 'admin')
-        toggleAdminBox();
-
-        // On change
-        roleSelect.addEventListener('change', toggleAdminBox);
+        toggleBoxes();
+        roleSelect.addEventListener('change', toggleBoxes);
     </script>
+
 </body>
 </html>

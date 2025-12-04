@@ -56,49 +56,49 @@
         }
     </style>
         <ul>
-            <ul>
             <% if (user && user.role === "admin") { %>
                 <!-- ADMIN MENU -->
                 <li class="nav-item">
-                <a class="nav-link" href="/profile">Profile</a>
+                    <a class="nav-link" href="/profile">Profile</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/exceptions">Exceptions</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/deliveries">Deliveries</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>
 
+            <% } else if (user && user.role === "compliance") { %>
+                <!-- COMPLIANCE MENU -->
                 <li class="nav-item">
-                <a class="nav-link" href="/exceptions">Exceptions</a>
+                    <a class="nav-link" href="/auditLog">Audit Trail</a>
                 </li>
-
                 <li class="nav-item">
-                <a class="nav-link" href="/auditLog">Audit Trail</a>
-                </li>
-
-                <li class="nav-item">
-                <a class="nav-link" href="/deliveries">Deliveries</a>
-                </li>
-
-                <li class="nav-item">
-                <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>
 
             <% } else if (user) { %>
                 <!-- NORMAL LOGGED-IN USER MENU -->
                 <li class="nav-item">
-                <a class="nav-link" href="/profile">Profile</a>
+                    <a class="nav-link" href="/profile">Profile</a>
                 </li>
-
                 <li class="nav-item">
-                <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>
 
             <% } else { %>
                 <!-- GUEST MENU -->
                 <li class="nav-item">
-                <a class="nav-link" href="/login">Login</a>
+                    <a class="nav-link" href="/login">Login</a>
                 </li>
-
                 <li class="nav-item">
-                <a class="nav-link text-primary fw-bold" href="/signup">Register</a>
+                    <a class="nav-link text-primary fw-bold" href="/signup">Register</a>
                 </li>
             <% } %>
-            </ul>
+        </ul>
+
         </ul>
     </div>
