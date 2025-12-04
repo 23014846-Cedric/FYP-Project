@@ -114,11 +114,43 @@
 </body>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
+
+
 <script>
 document.getElementById("exportExcel").addEventListener("click", () => {
     const table = document.querySelector("table");
-    const wb = XLSX.utils.table_to_book(table, { sheet: "Audit Logs" });
+
+    // Convert HTML table to sheet
+    const ws = XLSX.utils.table_to_sheet(table);
+
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+
+    // Convert column A (timestamp column) to real Date objects
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 }); // A column
+        const cell = ws[cellRef];
+
+        if (cell?.v) {
+            const dateStr = cell.v; // "2025-02-06 15:23:51"
+
+            // Convert to Excel date
+            const dateObj = new Date(dateStr);
+
+            if (!isNaN(dateObj.getTime())) {
+                cell.v = dateObj;     // assign Date
+                cell.t = "d";         // mark as date
+                cell.z = "yyyy-mm-dd hh:mm:ss"; // desired display format
+            }
+        }
+    }
+
+    // Create workbook and save
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Audit Logs");
     XLSX.writeFile(wb, "audit_logs.xlsx");
 });
 </script>
+
+
+
 </html>

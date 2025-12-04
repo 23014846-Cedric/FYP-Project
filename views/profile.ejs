@@ -13,8 +13,11 @@
           <span class="badge bg-primary"><%= user.role %></span>
 
           <hr class="my-4">
-
-          <a href="/profile/edit" class="btn btn-dark px-4">Edit Profile</a>
+            <% if (user && (user.role === "admin" )) { %>
+              <a href="/admin/profile" class="btn btn-dark px-4">Edit Profile</a>
+            <% } else { %>
+              <a href="/dashboard" class="btn btn-dark px-4">Dashboard</a>
+            <% } %>
         </div>
 
       </div>

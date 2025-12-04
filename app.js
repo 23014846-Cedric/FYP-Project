@@ -9,7 +9,6 @@ const jwt           = require('jsonwebtoken');
 
 // Models
 const CardDelivery  = require('./models/CardDelivery');
-const ErrorLog = require('./models/ErrorLog');
 
 // Routers
 const contactRouter   = require('./routes/contactRouter');
@@ -22,22 +21,12 @@ const adminRouter = require("./routes/adminRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
-const { requireAuth, requireRole } = require('./middleware/authMiddleware');
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGODB_URI;
 
 // -------------------- CORE MIDDLEWARE --------------------
-
-const { maskCard, maskAddress } = require('./utils/mask');
-
-// Make helpers available in ALL EJS views
-app.use((req, res, next) => {
-  res.locals.maskCard = maskCard;
-  res.locals.maskAddress = maskAddress;
-  next();
-});
 
 // Parse form data & JSON
 app.use(express.urlencoded({ extended: true }));
@@ -48,35 +37,6 @@ app.use(cookieParser());
 
 // Static assets
 app.use(express.static(path.join(__dirname, 'public')));
-
-// Global error-handling middleware – MUST be after all routes
-app.use(async (err, req, res, next) => {
-  try {
-    // Basic info
-    const statusCode = err.status || err.statusCode || 500;
-
-    await ErrorLog.create({
-      message: err.message || 'Unknown error',
-      stack: err.stack,
-      statusCode,
-      route: req.originalUrl,
-      method: req.method,
-      userId: req.user?.id || req.user?._id || null,
-      userEmail: req.user?.email || null,
-      userRole: req.user?.role || null,
-      ip: req.ip,
-      userAgent: req.get('User-Agent'),
-    });
-  } catch (logErr) {
-    console.error('Failed to log error:', logErr);
-  }
-
-  // For end-users: show friendly error page (no stack leak)
-  res.status(500);
-  res.render('500', {
-    message: 'Something went wrong on our side. Our team has been notified.',
-  });
-});
 
 // View engine (EJS)
 app.set('view engine', 'ejs');
@@ -120,8 +80,9 @@ app.get('/',        (req, res) => res.redirect('/login'));
 app.get('/login',   (req, res) => res.render('login',   { errors: [] }));
 app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: {} }));
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
-app.get('/contact', (req, res) => res.render('contact', { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
+
+
 app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'operations') {
     return res.status(403).render('403', {
@@ -140,6 +101,7 @@ app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
     res.render('errorDiagnostics', { logs: [] });
   }
 });
+
 
 // Protected dashboard (any logged-in user)
 // Protected dashboard
@@ -190,6 +152,7 @@ app.use('/', authRouter);
 
 // Contact (e.g. POST /contact)
 app.use('/', contactRouter);
+app.use('/contact', contactRouter);
 
 // Operations routes (operations team only)
 app.use("/operations", operationsRouter);
@@ -209,18 +172,21 @@ app.post('/wip', async (req, res) => {
 app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
 
 
-// Compliance ONLY access to audit logs
+
+
+// Compliance, admin, operations ONLY access to audit logs
 app.use(
   '/',
   authMiddleware,
   (req, res, next) => {
-    if (req.user && req.user.role === 'compliance') {
+    if (req.user && req.user.role === 'compliance' , 'admin' , 'operations') {
       return next();
     }
-    return res.status(403).send('Access denied. Compliance only.');
+    return res.status(403).send('Access denied. Compliance, admin, and operations only.');
   },
   auditRouter
 );
+
 
 // -------------------- DATABASE & SERVER --------------------
 
