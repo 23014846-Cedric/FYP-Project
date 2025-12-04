@@ -61,6 +61,16 @@ exports.signup = async (req, res) => {
       }
     }
 
+    // If user chose compliance, verify complianceCode
+    if (role === "compliance") {
+      if (!req.body.complianceCode) {
+        errors.push("Compliance access code is required for compliance role");
+      } else if (req.body.complianceCode !== "compliance") {
+        errors.push("Invalid compliance access code");
+      }
+    }
+
+
     if (errors.length > 0) {
       return res.render("signup", { errors, formData });
     }
@@ -71,7 +81,14 @@ exports.signup = async (req, res) => {
       name,
       email,
       passwordHash,
-      role: role === "admin" ? "admin" : "user",
+      role:
+      role === "admin"
+        ? "admin"
+        : role === "compliance"
+        ? "compliance"
+        : role === "operations"
+        ? "operations"
+        : "user",
     });
 
     res.redirect("/login");
@@ -118,6 +135,7 @@ exports.signin = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
+
     await AuditLog.create({
       username: user.name,
       user_id: user._id,
@@ -129,6 +147,20 @@ exports.signin = async (req, res) => {
     });
 
     res.redirect("/dashboard"); // change to your dashboard route
+
+    if (user.role === "compliance") {
+      return res.redirect("/auditLog");
+    }
+
+    if (user.role === "admin") {
+      return res.redirect("/dashboard");
+    }
+
+    // default user behavior
+    return res.redirect("/dashboard");
+    
+ // change to your dashboard route
+
   } catch (err) {
     console.error(err);
     res.render("login", { errors: ["Something went wrong during login"] });
@@ -160,7 +192,7 @@ exports.updateUserRole = async (req, res) => {
     if (req.user.role !== "admin") {
       return res.status(403).send("Access denied. Admins only.");
     }
-    
+
     const { userId, newRole } = req.body;
 
     const user = await User.findById(userId);

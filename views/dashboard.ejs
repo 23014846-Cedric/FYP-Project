@@ -52,6 +52,67 @@
             <br>
             <p class="hidden">Your role: <strong><%= user ? user.role : "N/A" %></strong></p>
         </div>
+                <!-- Stats Row (Clickable) -->
+        <div class="row g-3">
+
+            <div class="col-md-3">
+                <a href="/deliveries" class="text-decoration-none text-dark">
+                    <div class="card-box text-center">
+                        <p class="text-muted">Total Deliveries</p>
+                        <p class="stat-number"><%= stats ? stats.total : 0 %></p>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-3">
+                <a href="/deliveries" class="text-decoration-none text-dark">
+                    <div class="card-box text-center">
+                        <p class="text-muted">Delivered</p>
+                        <p class="stat-number text-success"><%= stats ? stats.delivered : 0 %></p>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-3">
+                <a href="/deliveries" class="text-decoration-none text-dark">
+                    <div class="card-box text-center">
+                        <p class="text-muted">In Transit</p>
+                        <p class="stat-number text-info"><%= stats ? stats.inTransit : 0 %></p>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-3">
+                <a href="/deliveries" class="text-decoration-none text-dark">
+                    <div class="card-box text-center">
+                        <p class="text-muted">Exceptions</p>
+                        <p class="stat-number text-danger"><%= stats ? stats.exceptions : 0 %></p>
+                    </div>
+                </a>
+            </div>
+
+        </div>
+
+        <!-- Charts Row -->
+        <div class="row g-3 mt-4">
+            <!-- Pie Chart: Delivered vs Incomplete -->
+            <div class="col-md-6">
+                <div class="card-box">
+                    <h5 class="mb-3">Delivery Completion Overview</h5>
+                    <canvas id="pieIncompleteChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Bar Chart: Status Breakdown -->
+            <div class="col-md-6">
+                <div class="card-box">
+                    <h5 class="mb-3">Delivery Status Breakdown</h5>
+                    <canvas id="barStatusChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <!-- Table -->
+        <div class="card-box mt-4">
 
         <!-- Stats Row (Clickable) -->
         <div class="row g-3">
@@ -109,53 +170,59 @@
                 <th>Updated At</th>
             </tr>
             </thead>
+                <tbody>
+                    <% if (deliveries && deliveries.length > 0) { %>
+                        <% deliveries.forEach(d => { %>
+                        <tr class="clickable-row 
+                            <%= d.status === 'Delivered' 
+                                ? 'table-success' 
+                                : d.status === 'Shipped' 
+                                    ? 'table-warning' 
+                                    : d.status === 'Failed' 
+                                        ? 'table-danger' 
+                                        : '' %>"
+                            onclick="window.location='/deliveries'">
 
-            <tbody>
-            <% if (deliveries && deliveries.length > 0) { %>
-                <% deliveries.forEach(d => { %>
-                <tr class="clickable-row" onclick="window.location='/deliveries'">
-                    <td>
-                        <% 
-                            // Get raw card number from your schema
-                            const rawCard = d.card_number || "";
+                            <td>
+                                <% if (user && user.role === "admin") { %>
+                                    <%= d.card_number %>   <!-- Admin sees full card number -->
+                                <% } else { %>
+                                    <%= maskCard(d.card_number) %>  <!-- Others see masked card -->
+                                <% } %>
+                            </td>
 
-                            // Simple masking helper
-                            function maskCard(card) {
-                            if (!card) return "-";
-                            const clean = card.replace(/\s+/g, "");   // remove spaces
-                            const last4 = clean.slice(-4);
-                            return "**** **** **** " + last4;
-                            }
-                        %>
+                            <td><%= d.recipient_name %></td>
 
-                        <% if (user && user.role === "admin") { %>
-                            <%= rawCard %>   <!-- Admin sees full card number -->
-                        <% } else { %>
-                            <%= maskCard(rawCard) %>  <!-- Normal user sees masked -->
-                        <% } %>
-                    </td>
-                    <td><%= d.recipient_name %></td>
-                    <td><%= d.address %></td>
-                    <td><%= d.courier || '-' %></td>
-                    <td><%= d.status %></td>
-                    <td>
-                    <% if (d.updated_at) { %>
-                        <%= new Date(d.updated_at).toISOString().slice(0,19).replace('T',' ') %>
+                            <td>
+                                <% if (user && user.role === "admin") { %>
+                                    <%= d.address %>   <!-- Admin sees full address -->
+                                <% } else { %>
+                                    <%= maskAddress(d.address) %>  <!-- Others see masked address -->
+                                <% } %>
+                            </td>
+
+                            <td><%= d.recipient_name %></td>
+                            <td><%= d.address %></td>
+                            <td><%= d.courier || '-' %></td>
+                            <td><%= d.status %></td>
+                            <td>
+                                <% if (d.updated_at) { %>
+                                    <%= new Date(d.updated_at).toISOString().slice(0,19).replace('T',' ') %>
+                                <% } else { %>
+                                    -
+                                <% } %>
+                            </td>
+                        </tr>
+                        <% }) %>
                     <% } else { %>
-                        -
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">
+                                No delivery records found.
+                            </td>
+                        </tr>
                     <% } %>
-                    </td>
-                </tr>
-                <% }) %>
-            <% } else { %>
-                <tr>
-                <td colspan="6" class="text-center text-muted">
-                    No delivery records found.
-                </td>
-                </tr>
-            <% } %>
-            </tbody>
-        </table>
+                </tbody>
+            </table>
 
             <% if (user && user.role === "admin") { %>
                 <div class="mt-2 text-end">
@@ -166,7 +233,92 @@
             <% } %>
         </div>
     </div>
+        <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <script>
+        // Safely pass stats from server to client
+        const stats = <%- JSON.stringify(stats || { total: 0, delivered: 0, inTransit: 0, exceptions: 0 }) %>;
+
+        const total = stats.total || 0;
+        const delivered = stats.delivered || 0;
+        const inTransit = stats.inTransit || 0;
+        const exceptions = stats.exceptions || 0;
+
+        // Incomplete deliveries = everything that is not delivered
+        const incomplete = Math.max(total - delivered, 0);
+
+        // Only draw charts if there is data
+        if (total > 0) {
+            // PIE CHART: Delivered vs Incomplete
+            const pieCtx = document.getElementById('pieIncompleteChart').getContext('2d');
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Delivered', 'Incomplete'],
+                    datasets: [{
+                        data: [delivered, incomplete],
+                        backgroundColor: [
+                            'rgba(25, 135, 84, 0.8)',   // green
+                            'rgba(220, 53, 69, 0.8)'   // red
+                        ],
+                        borderColor: [
+                            'rgba(25, 135, 84, 1)',
+                            'rgba(220, 53, 69, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+
+            // BAR CHART: Delivered / In Transit / Exceptions
+            const barCtx = document.getElementById('barStatusChart').getContext('2d');
+            new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Delivered', 'In Transit', 'Exceptions'],
+                    datasets: [{
+                        label: 'Number of Deliveries',
+                        data: [delivered, inTransit, exceptions],
+                        backgroundColor: [
+                            'rgba(25, 135, 84, 0.8)',   // green
+                            'rgba(13, 202, 240, 0.8)',  // blue
+                            'rgba(220, 53, 69, 0.8)'    // red
+                        ],
+                        borderColor: [
+                            'rgba(25, 135, 84, 1)',
+                            'rgba(13, 202, 240, 1)',
+                            'rgba(220, 53, 69, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: true }
+                    }
+                }
+            });
+        } else {
+            // If no data, optionally hide the canvases or show a message
+            console.log('No delivery stats available for charts.');
+        }
+    </script>
     <%- include('partials/footer') %>
 </body>
 </html>
