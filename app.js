@@ -72,10 +72,7 @@ function adminMiddleware(req, res, next) {
   return res.status(403).send('Access denied. Admins only.');
 }
 
-<<<<<<< HEAD
-=======
 
->>>>>>> 1e3f07dbd829294dedb489bd1e02142a40dc06d3
 // -------------------- PAGE ROUTES --------------------
 
 // Public pages
@@ -84,8 +81,8 @@ app.get('/login',   (req, res) => res.render('login',   { errors: [] }));
 app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: {} }));
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
-<<<<<<< HEAD
-=======
+
+
 app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
   if (!req.user || req.user.role !== 'operations') {
     return res.status(403).render('403', {
@@ -104,7 +101,7 @@ app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
     res.render('errorDiagnostics', { logs: [] });
   }
 });
->>>>>>> 1e3f07dbd829294dedb489bd1e02142a40dc06d3
+
 
 // Protected dashboard (any logged-in user)
 // Protected dashboard
@@ -170,8 +167,8 @@ app.use('/deliveries', authMiddleware, adminMiddleware, deliveryRouter);
 app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
 
 
-<<<<<<< HEAD
-=======
+
+
 // Compliance ONLY access to audit logs
 app.use(
   '/',
@@ -184,7 +181,7 @@ app.use(
   },
   auditRouter
 );
->>>>>>> 1e3f07dbd829294dedb489bd1e02142a40dc06d3
+
 
 // -------------------- DATABASE & SERVER --------------------
 
