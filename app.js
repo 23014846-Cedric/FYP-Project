@@ -104,19 +104,11 @@ app.use(attachUserFromToken);
 
 // Simple admin-only middleware
 function adminMiddleware(req, res, next) {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && req.user.role === 'admin' || req.user.role === 'operations') {
     return next();
   }
   // you can change this to res.redirect('/dashboard') if you prefer
   return res.status(403).send('Access denied. Admins only.');
-}
-
-// Simple compliance-only middleware
-function complianceMiddleware(req, res, next) {
-  if (req.user && req.user.role === 'compliance') {
-    return next();
-  }
-  return res.status(403).send('Access denied. Compliance only.');
 }
 
 

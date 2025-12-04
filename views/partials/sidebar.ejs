@@ -55,7 +55,7 @@
     </style>
 
         <ul>
-            <% if (user && user.role === "admin") { %>
+            <% if (user && (user.role === "admin" || user.role === "operations")) { %>
                 <!-- ADMIN MENU -->
                 <li class="nav-item">
                     <a class="nav-link" href="/profile">Profile</a>
