@@ -234,10 +234,6 @@
                                 </svg>
                             </span>
                             <select name="role" id="role" class="form-select">
-                                <option value="user"
-                                    <%= (!formData || formData.role === 'user') ? 'selected' : '' %>>
-                                    User
-                                </option>
 
                                 <option value="operations"
                                     <%= (formData && formData.role === 'operations') ? 'selected' : '' %>>
@@ -249,11 +245,15 @@
                                     Admin
                                 </option>
 
-                                <option value="compliance"
-                                    <%= (formData && formData.role === 'compliance') ? 'selected' : '' %>>
-                                    Compliance
+                                  <option value="printer"
+                                    <%= (formData && formData.role === 'printer') ? 'selected' : '' %>>
+                                    Printer (Idemia)
                                 </option>
                             </select>
+                            <div class="helper-text mt-1">
+                                Most users should register as <strong>Operations</strong>.
+                                <br>Admin is for system owners; Printer is for Idemia to mark returns.
+                            </div>
                         </div>
                         <div class="helper-text mt-1">
                             Standard staff accounts should use <strong>User</strong>. Admin is for system owners only.

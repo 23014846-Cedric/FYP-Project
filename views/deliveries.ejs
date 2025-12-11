@@ -80,12 +80,16 @@
 
           <td>
             <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1">
-              <select name="new_status" class="form-select form-select-sm">
-                <option value="Pending"   <%= d.status === 'Pending' ? 'selected' : '' %>>Pending</option>
-                <option value="Shipped"   <%= d.status === 'Shipped' ? 'selected' : '' %>>Shipped</option>
-                <option value="Delivered" <%= d.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
-                <option value="Failed"    <%= d.status === 'Failed' ? 'selected' : '' %>>Failed</option>
-              </select>
+                <select name="status" class="form-select form-select-sm">
+                  <option value="Pending"             <%= d.status === 'Pending' ? 'selected' : '' %>>Pending</option>
+                  <option value="Pulled Out"          <%= d.status === 'Pulled Out' ? 'selected' : '' %>>Pulled Out</option>
+                  <option value="Not Found"           <%= d.status === 'Not Found' ? 'selected' : '' %>>Not Found</option>
+                  <option value="Handed to Courier"   <%= d.status === 'Handed to Courier' ? 'selected' : '' %>>Handed to Courier</option>
+                  <option value="Delivered"           <%= d.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
+                  <option value="Returned to Printer" <%= d.status === 'Returned to Printer' ? 'selected' : '' %>>Returned to Printer</option>
+                  <option value="Destroyed"           <%= d.status === 'Destroyed' ? 'selected' : '' %>>Destroyed</option>
+                  <option value="Reprocessing"        <%= d.status === 'Reprocessing' ? 'selected' : '' %>>Reprocessing</option>
+                </select>
               <button type="submit" class="btn btn-sm btn-primary">Save</button>
             </form>
           </td>

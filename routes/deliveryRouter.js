@@ -245,7 +245,16 @@ router.post('/:id/status', async (req, res) => {
     const { new_status } = req.body;
 
     // Optional: validate status here as well
-    const allowedStatuses = ['Pending', 'Shipped', 'Delivered', 'Failed'];
+    const allowedStatuses = [
+      'Pending',
+      'Pulled Out',
+      'Not Found',
+      'Handed to Courier',
+      'Delivered',
+      'Returned to Printer',
+      'Destroyed',
+      'Reprocessing'
+    ];
     if (!allowedStatuses.includes(new_status)) {
       return res.status(400).send('Invalid status');
     }

@@ -21,9 +21,11 @@ const deliveryRouter  = require('./routes/deliveryRouter');
 const exceptionRouter = require('./routes/exceptionRouter');
 const operationsRouter = require("./routes/operationsRouter");
 const adminRouter = require("./routes/adminRouter");
+const printerRouter = require("./routes/printerRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
+const requireRole = require('./middleware/requireRole');
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -75,11 +77,10 @@ app.use(attachUserFromToken);
 
 // Simple admin-only middleware
 function adminMiddleware(req, res, next) {
-  if (req.user && req.user.role === 'admin' || req.user.role === 'operations') {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'operations')) {
     return next();
   }
-  // you can change this to res.redirect('/dashboard') if you prefer
-  return res.status(403).send('Access denied. Admins only.');
+  return res.status(403).send('Access denied. Admins / Operations only.');
 }
 
 
@@ -170,33 +171,44 @@ app.use("/operations", operationsRouter);
 // Admin-only modules
 app.use("/admin", adminRouter);
 
+// Printer routes (Idemia only)
+app.use(
+  "/printer",
+  authMiddleware,
+  requireRole("printer"),
+  printerRouter
+);
+
 // Deliveries (admin only)
-app.use('/deliveries', authMiddleware, adminMiddleware, deliveryRouter);
+// Deliveries – Admin + Operations
+app.use(
+  '/deliveries',
+  authMiddleware,
+  requireRole(['admin', 'operations']),
+  deliveryRouter
+);
 app.post('/wip', async (req, res) => {
   return res.status(403).render('wip', {
     message: "This feature is still under development."
   });
 });
 
-// Exceptions (admin only)
-app.use('/exceptions', authMiddleware, adminMiddleware, exceptionRouter);
+// Exceptions – Admin + Operations
+app.use(
+  '/exceptions',
+  authMiddleware,
+  requireRole(['admin', 'operations']),
+  exceptionRouter
+);
 
 
-
-
-// Compliance ONLY access to audit logs
+// Audit Log – Admin only
 app.use(
   '/',
   authMiddleware,
-  (req, res, next) => {
-    if (req.user && req.user.role === 'compliance' ) {
-      return next();
-    }
-    return res.status(403).send('Access denied. Compliance, only.');
-  },
+  requireRole('admin'),
   auditRouter
 );
-
 
 // -------------------- DATABASE & SERVER --------------------
 

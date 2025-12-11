@@ -1,7 +1,17 @@
 // models/CardDelivery.js
 const mongoose = require('mongoose');
 
-const STATUS = ['Pending', 'Shipped', 'Delivered', 'Failed'];
+// High-level lifecycle of a card delivery
+const STATUS = [
+  'Pending',             // created, not yet handed to courier
+  'Pulled Out',          // removed from batch before courier
+  'Not Found',           // address / recipient issue
+  'Handed to Courier',   // with 2GO / LBC
+  'Delivered',           // successful delivery
+  'Returned to Printer', // sent back to Idemia
+  'Destroyed',           // destroyed by Idemia
+  'Reprocessing'         // reprinted / preparing redelivery
+];
 
 const cardDeliverySchema = new mongoose.Schema(
   {
@@ -27,6 +37,7 @@ const cardDeliverySchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: "-",
+      // suggested values: "2GO", "LBC", "Other"
     },
 
     status: {
@@ -42,7 +53,6 @@ const cardDeliverySchema = new mongoose.Schema(
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: false }
-    // We manually manage updated_at
   }
 );
 

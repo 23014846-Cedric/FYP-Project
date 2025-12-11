@@ -1,6 +1,8 @@
+// models/User.js
 const mongoose = require('mongoose');
 
-const ALLOWED_ROLES = ['admin', 'user', 'courier', 'compliance', 'operations'];
+// Updated roles – business users only
+const ALLOWED_ROLES = ['admin', 'operations', 'printer'];
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
@@ -18,7 +20,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: ALLOWED_ROLES,
-    default: 'user'
+    default: 'operations'   // default staff = operations
   }
 });
 

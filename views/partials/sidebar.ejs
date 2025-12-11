@@ -55,7 +55,7 @@
     </style>
 
         <ul>
-            <% if (user && (user.role === "admin" )) { %>
+            <% if (user && user.role === "admin") { %>
                 <!-- ADMIN MENU -->
                 <li class="nav-item">
                     <a class="nav-link" href="/profile">Profile</a>
@@ -70,40 +70,19 @@
                     <a class="nav-link" href="/deliveries">Deliveries</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>
-
-            <% } else if (user && user.role === "compliance") { %>
-                <!-- COMPLIANCE MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/auditLog">Audit Trail</a>
+                    <a class="nav-link" href="/auditLog">Audit Trail</a>   <!-- moved here -->
                 </li>
                 <li class="nav-item">
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>
-
-
-            <% } else if (user && user.role === "operations") { %>
-            <!-- OPERATIONS MENU -->
+            <% } else if (user && user.role === "printer") { %>
+                <!-- PRINTER MENU -->
                 <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/exceptions">Exceptions</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/deliveries">Deliveries</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/errorDiagnostics">Error Diagnostics</a>
-                </li>
-                  <li class="nav-item">
-                    <a class="nav-link" href="/contact/messages">Contact Queries</a>
+                    <a class="nav-link" href="/printer/returns">Returned Cards</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>      
-                
+                </li>
             <% } else if (user) { %>
                 <!-- NORMAL LOGGED-IN USER MENU -->
                 <li class="nav-item">
@@ -113,7 +92,7 @@
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>               
 
-            <% } else { %>
+            <% }  else { %>
                 <!-- GUEST MENU -->
                 <li class="nav-item">
                     <a class="nav-link" href="/login">Login</a>
@@ -121,7 +100,7 @@
                 <li class="nav-item">
                     <a class="nav-link text-primary fw-bold" href="/signup">Register</a>
                 </li>
-            <% } %>
+            <% } %> 
         </ul>
 
         </ul>

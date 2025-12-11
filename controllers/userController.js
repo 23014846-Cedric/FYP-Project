@@ -61,34 +61,21 @@ exports.signup = async (req, res) => {
       }
     }
 
-    // If user chose compliance, verify complianceCode
-    if (role === "compliance") {
-      if (!req.body.complianceCode) {
-        errors.push("Compliance access code is required for compliance role");
-      } else if (req.body.complianceCode !== "compliance") {
-        errors.push("Invalid compliance access code");
-      }
-    }
-
-
     if (errors.length > 0) {
       return res.render("signup", { errors, formData });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT);
 
-    await User.create({
+    const ALLOWED_ROLES = ["admin", "operations", "printer"];
+
+    const normalizedRole = ALLOWED_ROLES.includes(role) ? role : "operations";
+
+    const user = await User.create({
       name,
       email,
       passwordHash,
-      role:
-      role === "admin"
-        ? "admin"
-        : role === "compliance"
-        ? "compliance"
-        : role === "operations"
-        ? "operations"
-        : "user",
+      role: normalizedRole
     });
 
     res.redirect("/login");

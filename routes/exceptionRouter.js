@@ -9,7 +9,14 @@ const CardDelivery = require('../models/CardDelivery');
 router.get('/', async (req, res) => {
     try {
         const exceptions = await CardDelivery.find({
-            status: { $in: ['Failed', 'Delayed'] }
+        status: {
+            $in: [
+            'Pulled Out',
+            'Not Found',
+            'Returned to Printer',
+            'Reprocessing'
+            ]
+        }
         })
         .sort({ expectedDate: 1 })   // sort by upcoming date
         .lean();

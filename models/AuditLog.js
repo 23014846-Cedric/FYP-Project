@@ -55,4 +55,10 @@ const auditLogSchema = new mongoose.Schema({
   },
 });
 
+// Auto-delete audit logs 90 days after timestamp
+auditLogSchema.index(
+  { timestamp: 1 },
+  { expireAfterSeconds: 90 * 24 * 60 * 60 }  // 90 days
+);
+
 module.exports = mongoose.model('AuditLog', auditLogSchema);
