@@ -22,10 +22,12 @@ const exceptionRouter = require('./routes/exceptionRouter');
 const operationsRouter = require("./routes/operationsRouter");
 const adminRouter = require("./routes/adminRouter");
 const printerRouter = require("./routes/printerRouter");
+const revealRouter = require("./routes/revealRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
 const requireRole = require('./middleware/requireRole');
+const revealMiddleware = require("./middleware/revealMiddleware");
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -47,12 +49,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// Reveal middleware to check for card number and address dashboard
+app.use(revealMiddleware);
+
 // Make mask helpers available globally
 app.use((req, res, next) => {
   res.locals.maskCard = maskCard;
   res.locals.maskAddress = maskAddress;
   next();
 });
+
+// Mount reveal router
+app.use(revealRouter);
 
 // Attach decoded user (if any) to res.locals for all views
 function attachUserFromToken(req, res, next) {
@@ -120,16 +128,12 @@ app.get('/dashboard', authMiddleware, async (req, res) => {
   try {
     let deliveries;
 
-    // If admin -> see everything
-    if (req.user && (req.user.role === 'admin' || req.user.role === 'operations')) {
-      deliveries = await CardDelivery.find().lean();
-    } else {
-      // Normal user -> only see their own deliveries
-      // Assumes CardDelivery.recipient_name matches req.user.name (e.g. "Mr Ling")
-      deliveries = await CardDelivery.find({
-        recipient_name: req.user.name
-      }).lean();
-    }
+  // Admin, Operations, Printer all see ALL deliveries
+  if (req.user && ['admin', 'operations', 'printer'].includes(req.user.role)) {
+    deliveries = await CardDelivery.find().lean();
+  } else {
+    return res.status(403).send('Access denied');
+  }
 
     const stats = {
       total: deliveries.length,
