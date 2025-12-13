@@ -63,7 +63,6 @@
 </head>
 
 <body>
-
   <%- include("partials/navbar") %>
   <div class="sidebar-hover-zone"></div>
   <%- include("partials/sidebar") %>
@@ -81,7 +80,7 @@
 
         <p class="mb-0">
           Logged in as:
-          <strong><%= user.name %></strong> 
+          <strong><%= user.name %></strong>
           (<%= user.role %>)
         </p>
       </div>
@@ -98,6 +97,7 @@
                 <th>Email</th>
                 <th>Role</th>
                 <th>User ID</th>
+                <th class="text-end">Actions</th>
               </tr>
             </thead>
 
@@ -106,8 +106,32 @@
                 <tr>
                   <td><%= u.name %></td>
                   <td><%= u.email %></td>
-                  <td><%= u.role %></td>
+                  <td>
+                    <span class="badge 
+                      <%= u.role === 'admin' ? 'bg-danger'
+                        : u.role === 'operations' ? 'bg-primary'
+                        : 'bg-secondary' %>">
+                      <%= u.role %>
+                    </span>
+                  </td>
                   <td class="text-muted small"><%= u._id %></td>
+
+                  <!-- Actions -->
+                  <td class="text-end">
+                    <% if (user.role === 'admin' && String(user._id) !== String(u._id)) { %>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-danger"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteUserModal"
+                        data-user-id="<%= u._id %>"
+                        data-user-name="<%= u.name %>">
+                        Delete
+                      </button>
+                    <% } else { %>
+                      <span class="text-muted small">—</span>
+                    <% } %>
+                  </td>
                 </tr>
               <% }) %>
             </tbody>
@@ -120,10 +144,60 @@
         <a class="btn btn-secondary" href="/dashboard">Back to Dashboard</a>
       </div>
 
-    </div> <!-- end content-inner -->
+    </div>
+  </div>
 
-  </div> <!-- end content-container -->
+  <!-- Delete User Confirmation Modal (must be inside body) -->
+  <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+
+        <div class="modal-header">
+          <h5 class="modal-title text-danger">Confirm User Deletion</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+
+        <div class="modal-body">
+          <p>
+            Are you sure you want to delete user:
+            <strong id="deleteUserName"></strong>?
+          </p>
+          <p class="text-danger small mb-0">
+            This action cannot be undone.
+          </p>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+
+          <form id="deleteUserForm" method="POST">
+            <button type="submit" class="btn btn-danger">
+              Yes, Delete
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <%- include("partials/footer") %>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    const deleteModal = document.getElementById('deleteUserModal');
+    const deleteUserName = document.getElementById('deleteUserName');
+    const deleteUserForm = document.getElementById('deleteUserForm');
+
+    deleteModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const userId = button.getAttribute('data-user-id');
+      const userName = button.getAttribute('data-user-name');
+
+      deleteUserName.textContent = userName;
+      deleteUserForm.action = `/admin/users/${userId}/delete`;
+    });
+  </script>
 </body>
 </html>

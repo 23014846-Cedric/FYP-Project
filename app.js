@@ -173,7 +173,7 @@ app.use('/contact', contactRouter);
 app.use("/operations", operationsRouter);
 
 // Admin-only modules
-app.use("/admin", adminRouter);
+app.use("/admin",authMiddleware, adminRouter);
 
 // Printer routes (Idemia only)
 app.use(
