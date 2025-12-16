@@ -2,6 +2,8 @@
 const express = require('express');
 const router = express.Router();
 
+const crypto = require('crypto'); // ✅ NEW (batch/session id)
+
 const CardDelivery = require('../models/CardDelivery');
 const AuditLog = require('../models/AuditLog');
 
@@ -22,37 +24,38 @@ function last4(card) {
 }
 
 // Inline helper: write an audit log entry
-async function addAuditLog(req, {
-  action_type,
-  entity_type,
-  entity_id,
-  field = null,
-  old_value = null,
-  new_value = null,
-  source = "Web",
-  remarks = "",
-}) {
+async function addAuditLog(
+  req,
+  {
+    action_type,
+    entity_type,
+    entity_id,
+    field = null,
+    old_value = null,
+    new_value = null,
+    source = 'Web',
+    remarks = '',
+  }
+) {
   try {
     const user = req.user || null;
 
     await AuditLog.create({
-      username: user ? user.name : "System",
+      username: user ? user.name : 'System',
       user_id: user ? user.id : null,
       action_type,
       entity_type,
       entity_id,
       field,
-      old_value: old_value !== undefined && old_value !== null
-        ? String(old_value)
-        : null,
-      new_value: new_value !== undefined && new_value !== null
-        ? String(new_value)
-        : null,
+      old_value:
+        old_value !== undefined && old_value !== null ? String(old_value) : null,
+      new_value:
+        new_value !== undefined && new_value !== null ? String(new_value) : null,
       source,
       remarks,
     });
   } catch (err) {
-    console.error("Error writing audit log:", err);
+    console.error('Error writing audit log:', err);
   }
 }
 
@@ -60,30 +63,185 @@ async function addAuditLog(req, {
 const deliveryValidationRules = [
   body('card_number')
     .trim()
-    .matches(/^\d{16}$/).withMessage('Card number must be 16 digits'),
+    .matches(/^\d{16}$/)
+    .withMessage('Card number must be 16 digits'),
   body('recipient_name')
     .trim()
-    .notEmpty().withMessage('Recipient name is required')
-    .isLength({ max: 100 }).withMessage('Recipient name too long'),
-  body('address')
-    .trim()
-    .notEmpty().withMessage('Address is required'),
+    .notEmpty()
+    .withMessage('Recipient name is required')
+    .isLength({ max: 100 })
+    .withMessage('Recipient name too long'),
+  body('address').trim().notEmpty().withMessage('Address is required'),
   body('courier')
     .optional({ checkFalsy: true })
-    .isLength({ max: 50 }).withMessage('Courier name too long'),
+    .isLength({ max: 50 })
+    .withMessage('Courier name too long'),
   body('status')
     .optional()
     .isIn(['Pending', 'Shipped', 'Delivered', 'Failed'])
-    .withMessage('Invalid status value')
+    .withMessage('Invalid status value'),
 ];
 
+
+function toUpperTrim(v) {
+  return String(v ?? '').trim().toUpperCase();
+}
+
+function cleanDigits(v) {
+  return String(v ?? '').replace(/\D+/g, '');
+}
+
 /**
- * GET /deliveries
- * Show all deliveries in the table
+ * Reads the sheet as a 2D array, finds the header row and return objects.
  */
+function parseProgressiveReportRows(sheet) {
+  const matrix = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+  // Find the best header row
+  let headerRowIndex = -1;
+
+  // Prefer the row that contains "REFERENCE NUMBER"
+  for (let i = 0; i < matrix.length; i++) {
+    const row = matrix[i].map(toUpperTrim);
+    if (row.includes('REFERENCE NUMBER') && row.includes('NAME') && row.includes('ADDRESS1')) {
+      headerRowIndex = i;
+      break;
+    }
+  }
+
+  // Fallback: any row with NAME + ADDRESS1
+  if (headerRowIndex === -1) {
+    for (let i = 0; i < matrix.length; i++) {
+      const row = matrix[i].map(toUpperTrim);
+      if (row.includes('NAME') && row.includes('ADDRESS1')) {
+        headerRowIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (headerRowIndex === -1) return [];
+
+  const headers = matrix[headerRowIndex].map(h => String(h).trim());
+  const out = [];
+
+  for (let r = headerRowIndex + 1; r < matrix.length; r++) {
+    const row = matrix[r];
+
+    // Skip fully empty rows
+    const hasAny = row.some(cell => String(cell).trim() !== '');
+    if (!hasAny) continue;
+
+    // Build object
+    const obj = {};
+    for (let c = 0; c < headers.length; c++) {
+      const key = headers[c];
+      if (!key) continue; // skip empty header cells
+      obj[key] = row[c];
+    }
+
+    out.push(obj);
+  }
+
+  return out;
+}
+
+/**
+ * Must have name
+ * Must have at least one address field (ADDRESS1-ADDRESS4/ CITY/ ZIPCODE)
+ * Must have an identifier we can store as card_number
+ */
+function validateProgressiveRow(row) {
+  const name = String(row['NAME'] ?? '').trim();
+  const nameUpper = toUpperTrim(name);
+
+  // reject obvious header rows
+  if (!name) return false;
+  if (nameUpper === 'NAME' || nameUpper === 'SHPR_NAME') return false;
+
+  const addressParts = [
+    row['ADDRESS1'],
+    row['ADDRESS2'],
+    row['ADDRESS3'],
+    row['ADDRESS4'],
+    row['CITY'],
+    row['ZIPCODE'],
+  ].map(v => String(v ?? '').trim()).filter(Boolean);
+
+  if (addressParts.length === 0) return false;
+
+  // reject "address header" rows like: "ADDRESS1, ADDRESS2, ..."
+  const addressJoinedUpper = toUpperTrim(addressParts.join(' '));
+  if (addressJoinedUpper.includes('ADDRESS1') && addressJoinedUpper.includes('ADDRESS2')) {
+    return false;
+  }
+
+  // require a real id (digits)
+  const card_number = pickCardNumber(row);
+  if (!card_number) return false;
+
+  return true;
+}
+
+function mapFileStatusToAppStatus(fileStatus) {
+  const s = toUpperTrim(fileStatus);
+
+  // Common explicit values
+  if (s === 'DELIVERED') return 'Delivered';
+  if (s === 'IN TRANSIT') return 'Handed to Courier';
+
+
+  if (s.includes('BAD') || s.includes('DOUBLE')) return 'Not Found';
+
+  // Unknown / empty placeholder
+  if (!s) return 'Pending';
+
+  // Fallback
+  return 'Pending';
+}
+
+
+function buildAddress(row) {
+  const parts = [
+    row['ADDRESS1'],
+    row['ADDRESS2'],
+    row['ADDRESS3'],
+    row['ADDRESS4'],
+    row['CITY'],
+    row['ZIPCODE'],
+  ]
+    .map(v => String(v ?? '').trim())
+    .filter(Boolean);
+
+  return parts.join(', ');
+}
+
+
+function pickCardNumber(row) {
+  const panDigits = cleanDigits(row['PAN']);
+  if (panDigits.length === 16) return panDigits;
+
+  const ref = String(row['REFERENCE NUMBER'] ?? '').trim();
+  if (cleanDigits(ref).length > 0) return ref;
+
+  const awb = String(row['AWB NUMBER'] ?? '').trim();
+  if (cleanDigits(awb).length > 0) return awb;
+
+  return '';
+}
+
+//routes
 router.get('/', async (req, res) => {
   try {
-    let deliveries = await CardDelivery.find().sort({ updated_at: -1 }).lean();
+    const batchId = req.cookies.last_import_batch;
+
+    if (!batchId) {
+      return res.render('deliveries', { deliveries: [] });
+    }
+
+    let deliveries = await CardDelivery.find({ import_batch_id: batchId })
+      .sort({ updated_at: -1 })
+      .lean();
 
     deliveries = deliveries.map(d => ({
       ...d,
@@ -97,77 +255,48 @@ router.get('/', async (req, res) => {
   }
 });
 
-/**
- * POST /deliveries
- * Manual create – now with validation (FR24)
- */
-router.post(
-  '/',
-  deliveryValidationRules,
-  async (req, res) => {
-    const errors = validationResult(req);
 
-    if (!errors.isEmpty()) {
-      console.warn('[Create Delivery] Validation failed:', errors.array());
+router.post('/', deliveryValidationRules, async (req, res) => {
+  const errors = validationResult(req);
 
-      // If you have a "create delivery" form view, you can render it with errors.
-      // For now, send a simple 400 with error messages.
-      return res.status(400).send(
-        'Validation error: ' + errors.array().map(e => e.msg).join(', ')
+  if (!errors.isEmpty()) {
+    console.warn('[Create Delivery] Validation failed:', errors.array());
+    return res
+      .status(400)
+      .send(
+        'Validation error: ' +
+          errors.array().map(e => e.msg).join(', ')
       );
-    }
-
-    try {
-      const { card_number, recipient_name, address, courier } = req.body;
-
-      const created = await CardDelivery.create({
-        card_number,
-        recipient_name,
-        address,
-        courier,
-        status: 'Pending',
-        updated_at: new Date(),
-      });
-
-      // Audit: track creation (mask card in logs – PDPA)
-      await addAuditLog(req, {
-        action_type: "CREATE_DELIVERY",
-        entity_type: "CardDelivery",
-        entity_id: created._id.toString(),
-        field: null,
-        old_value: null,
-        new_value: null,
-        source: "Deliveries Page",
-        remarks: `Created delivery for card **** **** **** ${last4(card_number)}`,
-      });
-
-      res.redirect('/deliveries');
-    } catch (err) {
-      console.error('Error creating delivery:', err);
-      res.status(500).send('Error creating delivery');
-    }
   }
-);
 
-/**
- * Helper: basic validation for Excel row (FR24 for import)
- */
-function validateExcelRow(row) {
-  const card = row['Card #'];
-  const recipient = row['Recipient'];
-  const address = row['Address'];
+  try {
+    const { card_number, recipient_name, address, courier } = req.body;
 
-  if (!card || !recipient || !address) return false;
-  const cleanCard = String(card).replace(/\s+/g, '');
-  if (!/^\d{16}$/.test(cleanCard)) return false;
+    const created = await CardDelivery.create({
+      card_number,
+      recipient_name,
+      address,
+      courier,
+      status: 'Pending',
+      updated_at: new Date(),
+    });
 
-  return true;
-}
+    await addAuditLog(req, {
+      action_type: 'CREATE_DELIVERY',
+      entity_type: 'CardDelivery',
+      entity_id: created._id.toString(),
+      source: 'Deliveries Page',
+      remarks: `Created delivery for card **** **** **** ${last4(card_number)}`,
+    });
 
-/**
- * POST /deliveries/import
- * Import deliveries from Excel (with basic validation & PDPA-safe logs)
- */
+    res.redirect('/deliveries');
+  } catch (err) {
+    console.error('Error creating delivery:', err);
+    res.status(500).send('Error creating delivery');
+  }
+});
+
+
 router.post('/import', upload.single('excel_file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -175,36 +304,46 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
       return res.redirect('/deliveries');
     }
 
+    //unique batch ID for current import session
+    const batchId = crypto.randomUUID();
+
     const workbook = xlsx.readFile(req.file.path);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = xlsx.utils.sheet_to_json(sheet);
 
-    console.log('[Import] Raw rows from Excel:', rows);
+    //parse your file format
+    const rows = parseProgressiveReportRows(sheet);
+
+    console.log('[Import] Parsed rows:', rows.length);
 
     const docs = [];
     let invalidCount = 0;
 
     for (const row of rows) {
-      if (!validateExcelRow(row)) {
+      if (!validateProgressiveRow(row)) {
         invalidCount++;
         continue;
       }
 
-      const rawStatus = row['Status'];
+      const card_number = pickCardNumber(row);
+      const recipient_name = String(row['NAME'] ?? '').trim();
+      const address = buildAddress(row);
 
-      // Normalise status (Excel has "In Transit", DB uses "Shipped")
-      let status = 'Pending';
-      if (rawStatus === 'Delivered') status = 'Delivered';
-      else if (rawStatus === 'In Transit') status = 'Shipped';
-      else if (['Pending', 'Shipped', 'Failed'].includes(rawStatus)) status = rawStatus;
+      const courier = String(row['PORT'] ?? '-').trim() || '-';
+
+      const status = mapFileStatusToAppStatus(row['STATUS']);
 
       docs.push({
-        card_number: String(row['Card #']).replace(/\s+/g, ''),
-        recipient_name: row['Recipient'],
-        address: row['Address'],
-        courier: row['Courier'] || '-',
+        card_number,
+        recipient_name,
+        address,
+        courier,
         status,
-        updated_at: new Date(),   // just use "now"
+        updated_at: new Date(),
+
+        // ✅ NEW: session/batch tracking
+        import_batch_id: batchId,
+        imported_by: req.user?.id || req.user?.name || 'system',
+        imported_at: new Date(),
       });
     }
 
@@ -214,18 +353,23 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
     }
 
     const result = await CardDelivery.insertMany(docs);
-    console.log(`[Import] Successfully inserted ${result.length} deliveries. Invalid rows: ${invalidCount}`);
+    console.log(
+      `[Import] Successfully inserted ${result.length} deliveries. Invalid rows: ${invalidCount}`
+    );
 
-    // Audit: log bulk import (no raw card numbers)
+    // ✅ Remember this batch in the current browser session
+    res.cookie('last_import_batch', batchId, {
+      httpOnly: true,
+      sameSite: 'lax',
+      // secure: true, // enable in production over HTTPS
+    });
+
     await addAuditLog(req, {
-      action_type: "IMPORT_DELIVERIES",
-      entity_type: "CardDelivery",
-      entity_id: "BULK",
-      field: null,
-      old_value: null,
-      new_value: null,
-      source: "Deliveries Import",
-      remarks: `Imported ${result.length} deliveries from Excel. Skipped ${invalidCount} invalid rows.`,
+      action_type: 'IMPORT_DELIVERIES',
+      entity_type: 'CardDelivery',
+      entity_id: 'BULK',
+      source: 'Deliveries Import',
+      remarks: `Imported ${result.length} deliveries from Excel. Skipped ${invalidCount} invalid rows. Batch: ${batchId}`,
     });
 
     res.redirect('/deliveries');
@@ -235,16 +379,20 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
   }
 });
 
-/**
- * POST /deliveries/:id/status
- * Update the status of an existing delivery
- */
+
+router.post('/clear-session', (req, res) => {
+  res.clearCookie('last_import_batch');
+  return res.redirect('/deliveries');
+});
+
+
 router.post('/:id/status', async (req, res) => {
   try {
     const deliveryId = req.params.id;
-    const { new_status } = req.body;
 
-    // Optional: validate status here as well
+
+    const new_status = req.body.status;
+
     const allowedStatuses = [
       'Pending',
       'Pulled Out',
@@ -253,13 +401,13 @@ router.post('/:id/status', async (req, res) => {
       'Delivered',
       'Returned to Printer',
       'Destroyed',
-      'Reprocessing'
+      'Reprocessing',
     ];
+
     if (!allowedStatuses.includes(new_status)) {
       return res.status(400).send('Invalid status');
     }
 
-    // Get the existing delivery to capture old status
     const existing = await CardDelivery.findById(deliveryId).lean();
     const oldStatus = existing ? existing.status : null;
 
@@ -268,16 +416,15 @@ router.post('/:id/status', async (req, res) => {
       updated_at: new Date(),
     });
 
-    // Audit: who changed what
     await addAuditLog(req, {
-      action_type: "UPDATE_STATUS",
-      entity_type: "CardDelivery",
+      action_type: 'UPDATE_STATUS',
+      entity_type: 'CardDelivery',
       entity_id: deliveryId,
-      field: "status",
+      field: 'status',
       old_value: oldStatus,
       new_value: new_status,
-      source: "Deliveries Page",
-      remarks: `Status updated by ${req.user?.name || "Unknown"}`,
+      source: 'Deliveries Page',
+      remarks: `Status updated by ${req.user?.name || 'Unknown'}`,
     });
 
     res.redirect('/deliveries');
@@ -286,7 +433,9 @@ router.post('/:id/status', async (req, res) => {
     res.status(500).send('Error updating delivery status');
   }
 });
+
 router.post('/wip', async (req, res) => {
   return res.status(403).render('wip');
 });
+
 module.exports = router;

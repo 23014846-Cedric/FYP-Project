@@ -9,11 +9,17 @@
   <%- include("partials/navbar") %>
   <div class="sidebar-hover-zone"></div>
   <%- include("partials/sidebar") %>
-    
+
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Deliveries</h1>
-  </div>
 
+    <!-- Optional: Clear current session import -->
+    <form method="POST" action="/deliveries/clear-session" class="m-0">
+      <button class="btn btn-outline-danger btn-sm" type="submit">
+        Clear Session
+      </button>
+    </form>
+  </div>
 
   <!-- Excel Import Card -->
   <div class="card mb-4">
@@ -45,41 +51,52 @@
     </div>
   </div>
 
+  <!-- If no deliveries (no import in this session yet) -->
+  <% if (!deliveries || deliveries.length === 0) { %>
+    <div class="alert alert-warning">
+      No deliveries to show yet for this session. Please import an Excel file.
+    </div>
+  <% } else { %>
 
-  <!-- Deliveries Table -->
-  <table class="table table-bordered table-striped">
-    <thead class="table-dark">
-      <tr>
-        <th>ID</th>
-        <th>Card #</th>
-        <th>Recipient</th>
-        <th>Address</th>
-        <th>Courier</th>
-        <th>Status</th>
-        <th>Updated At</th>
-        <th>Update Status</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      <% deliveries.forEach(d => { %>
+    <!-- Deliveries Table -->
+    <table class="table table-bordered table-striped align-middle">
+      <thead class="table-dark">
         <tr>
-          <td><%= d.id %></td>
-          <td><%= d.card_number %></td>
-          <td><%= d.recipient_name %></td>
-          <td><%= d.address %></td>
-          <td><%= d.courier || '-' %></td>
+          <th>ID</th>
+          <th>Card / Ref #</th>
+          <th>Recipient</th>
+          <th>Address</th>
+          <th>Courier</th>
+          <th>Status</th>
+          <th>Updated At</th>
+          <th>Update Status</th>
+        </tr>
+      </thead>
 
-          <td>
-            <span class="badge bg-info">
-              <%= d.status %>
-            </span>
-          </td>
+      <tbody>
+        <% deliveries.forEach(d => { %>
+          <tr>
+            <td><%= d.id %></td>
+            <td><%= d.card_number %></td>
+            <td><%= d.recipient_name %></td>
+            <td><%= d.address %></td>
+            <td><%= d.courier || '-' %></td>
 
-          <td><%= d.updated_at.toISOString().slice(0,19).replace('T',' ') %></td>
+            <td>
+              <span class="badge bg-info">
+                <%= d.status %>
+              </span>
+            </td>
 
-          <td>
-            <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1">
+            <td>
+              <% 
+                const dt = d.updated_at ? new Date(d.updated_at) : null;
+              %>
+              <%= dt ? dt.toISOString().slice(0,19).replace('T',' ') : '-' %>
+            </td>
+
+            <td>
+              <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1">
                 <select name="status" class="form-select form-select-sm">
                   <option value="Pending"             <%= d.status === 'Pending' ? 'selected' : '' %>>Pending</option>
                   <option value="Pulled Out"          <%= d.status === 'Pulled Out' ? 'selected' : '' %>>Pulled Out</option>
@@ -90,13 +107,16 @@
                   <option value="Destroyed"           <%= d.status === 'Destroyed' ? 'selected' : '' %>>Destroyed</option>
                   <option value="Reprocessing"        <%= d.status === 'Reprocessing' ? 'selected' : '' %>>Reprocessing</option>
                 </select>
-              <button type="submit" class="btn btn-sm btn-primary">Save</button>
-            </form>
-          </td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+
+                <button type="submit" class="btn btn-sm btn-primary">Save</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+  <% } %>
 
   <%- include('partials/footer') %>
 </body>

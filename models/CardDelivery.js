@@ -15,41 +15,17 @@ const STATUS = [
 
 const cardDeliverySchema = new mongoose.Schema(
   {
-    card_number: {
-      type: String,
-      required: true,
-      trim: true,
-    },
+    card_number: { type: String, required: true, trim: true },
+    recipient_name: { type: String, required: true, trim: true },
+    address: { type: String, required: true, trim: true },
+    courier: { type: String, trim: true, default: "-" },
+    status: { type: String, enum: STATUS, default: 'Pending' },
+    updated_at: { type: Date, default: Date.now },
 
-    recipient_name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    address: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    courier: {
-      type: String,
-      trim: true,
-      default: "-",
-      // suggested values: "2GO", "LBC", "Other"
-    },
-
-    status: {
-      type: String,
-      enum: STATUS,
-      default: 'Pending',
-    },
-
-    updated_at: {
-      type: Date,
-      default: Date.now,
-    },
+    //import tracking
+    import_batch_id: { type: String, index: true },     
+    imported_by: { type: String, trim: true },          
+    imported_at: { type: Date, default: Date.now },     
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: false }
