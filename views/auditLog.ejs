@@ -2,28 +2,157 @@
 <html>
 <head>
   <title>System Activity Log – Audit Trail</title>
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="p-4">
   <%- include("partials/navbar") %>
+
   <%
-  function getRowColor(action) {
-    if (action === "UPDATE_STATUS") return "table-success"; // green
-    if (action === "LOGIN" || action === "LOGOUT") return "table-warning"; // yellow
-    if (action === "ROLE_UPDATE" || action === "IMPORT_DELIVERIES") return "table-danger"; // red
-    return "";
-  }
-%>
+    function getRowColor(action) {
+      if (action === "UPDATE_STATUS") return "table-success";
+      if (action === "LOGIN" || action === "LOGOUT") return "table-warning";
+      if (action === "ROLE_UPDATE" || action === "IMPORT_DELIVERIES") return "table-danger";
+      return "";
+    }
+
+    // helper to keep query params when navigating pages
+    function buildQuery(overrides = {}) {
+      const params = new URLSearchParams();
+
+      const f = filters || {};
+      const entries = {
+        q: f.q || "",
+        action: f.action || "",
+        entity: f.entity || "",
+        user: f.user || "",
+        source: f.source || "",
+        from: f.from || "",
+        to: f.to || "",
+        sortBy: f.sortBy || "timestamp",
+        order: f.order || "desc",
+        limit: limit || 25,
+        page: page || 1,
+        ...overrides
+      };
+
+      Object.entries(entries).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && String(v).length > 0) params.set(k, v);
+      });
+
+      return params.toString();
+    }
+  %>
 
   <div class="sidebar-hover-zone"></div>
   <%- include("partials/sidebar") %>
-    
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>System Activity Log</h1>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h1 class="mb-0">System Activity Log</h1>
+    <div class="text-muted">
+      Showing <strong><%= logs ? logs.length : 0 %></strong> of <strong><%= total || 0 %></strong> logs
+    </div>
   </div>
 
-  <button id="exportExcel" class="btn btn-success mb-3">Export to Excel</button>
+  <!-- FILTERS + SORT + ROWS PER PAGE -->
+  <form class="card p-3 mb-3" method="GET" action="/auditLog">
+    <div class="row g-2 align-items-end">
+
+      <div class="col-12 col-md-4">
+        <label class="form-label">Search</label>
+        <input name="q" class="form-control" placeholder="keyword (user, action, entity id, remarks…)" value="<%= filters?.q || '' %>">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Action</label>
+        <select name="action" class="form-select">
+          <option value="">All</option>
+          <% (options?.actions || []).forEach(a => { %>
+            <option value="<%= a %>" <%= (filters?.action === a ? 'selected' : '') %>><%= a %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Entity</label>
+        <select name="entity" class="form-select">
+          <option value="">All</option>
+          <% (options?.entities || []).forEach(e => { %>
+            <option value="<%= e %>" <%= (filters?.entity === e ? 'selected' : '') %>><%= e %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">User</label>
+        <input name="user" class="form-control" placeholder="contains…" value="<%= filters?.user || '' %>">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Source</label>
+        <select name="source" class="form-select">
+          <option value="">All</option>
+          <% (options?.sources || []).forEach(s => { %>
+            <option value="<%= s %>" <%= (filters?.source === s ? 'selected' : '') %>><%= s %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">From</label>
+        <input type="date" name="from" class="form-control" value="<%= filters?.from || '' %>">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">To</label>
+        <input type="date" name="to" class="form-control" value="<%= filters?.to || '' %>">
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Sort by</label>
+        <select name="sortBy" class="form-select">
+          <% (options?.sortFields || ['timestamp']).forEach(sf => { %>
+            <option value="<%= sf %>" <%= (filters?.sortBy === sf ? 'selected' : '') %>><%= sf %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Order</label>
+        <select name="order" class="form-select">
+          <option value="desc" <%= (filters?.order === 'desc' ? 'selected' : '') %>>Newest first</option>
+          <option value="asc" <%= (filters?.order === 'asc' ? 'selected' : '') %>>Oldest first</option>
+        </select>
+      </div>
+
+      <div class="col-6 col-md-2">
+        <label class="form-label">Rows</label>
+        <select name="limit" class="form-select" onchange="this.form.submit()">
+          <% (options?.limits || [10,25,50,100]).forEach(l => { %>
+            <option value="<%= l %>" <%= (Number(limit) === Number(l) ? 'selected' : '') %>><%= l %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary w-100">Apply</button>
+        <a class="btn btn-outline-secondary w-100" href="/auditLog">Reset</a>
+      </div>
+
+    </div>
+
+    <!-- Always reset to page 1 when applying filters -->
+    <input type="hidden" name="page" value="1">
+  </form>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <button id="exportExcel" class="btn btn-success">Export to Excel</button>
+
+    <!-- Pagination summary -->
+    <div class="text-muted">
+      Page <strong><%= page %></strong> of <strong><%= totalPages %></strong>
+    </div>
+  </div>
+
   <table class="table table-bordered table-striped table-sm align-middle">
     <thead class="table-dark">
       <tr>
@@ -37,11 +166,12 @@
         <th>Remarks</th>
       </tr>
     </thead>
+
     <tbody>
       <% if (logs && logs.length > 0) { %>
         <% logs.forEach(log => { %>
           <tr class="<%= getRowColor(log.action_type) %>">
-            <!-- Time -->
+
             <td>
               <% if (log.timestamp) { %>
                 <%= new Date(log.timestamp).toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) %>
@@ -50,107 +180,119 @@
               <% } %>
             </td>
 
-            <!-- User -->
-            <td>
-              <strong><%= log.username || log.user_email || 'System' %></strong>
-            </td>
-
-            <!-- Action -->
+            <td><strong><%= log.username || log.user_email || 'System' %></strong></td>
             <td><%= log.action_type || '-' %></td>
-
-            <!-- Entity -->
             <td><%= log.entity_type || '-' %></td>
-
-            <!-- Entity ID -->
             <td><code><%= log.entity_id || '-' %></code></td>
-
-            <!-- Source -->
             <td><%= log.source || 'Web' %></td>
 
-            <!-- Old → New -->
             <td style="max-width: 420px; font-size: 0.85rem;">
               <% if (log.field && (log.old_value || log.new_value)) { %>
                 <div>
                   <strong><code><%= log.field %></code>:</strong>
-                  <code><%= log.old_value !== undefined && log.old_value !== null ? log.old_value : '-' %></code>
+                  <code><%= (log.old_value !== undefined && log.old_value !== null) ? log.old_value : '-' %></code>
                   &nbsp;&rarr;&nbsp;
-                  <code><%= log.new_value !== undefined && log.new_value !== null ? log.new_value : '-' %></code>
+                  <code><%= (log.new_value !== undefined && log.new_value !== null) ? log.new_value : '-' %></code>
                 </div>
               <% } else if (log.old_value || log.new_value) { %>
-                <div>
-                  <strong>Old:</strong>
-                  <code><%= log.old_value !== undefined ? log.old_value : '-' %></code>
-                </div>
-                <div>
-                  <strong>New:</strong>
-                  <code><%= log.new_value !== undefined ? log.new_value : '-' %></code>
-                </div>
+                <div><strong>Old:</strong> <code><%= (log.old_value !== undefined && log.old_value !== null) ? log.old_value : '-' %></code></div>
+                <div><strong>New:</strong> <code><%= (log.new_value !== undefined && log.new_value !== null) ? log.new_value : '-' %></code></div>
               <% } else { %>
                 <span class="text-muted">No value change recorded</span>
               <% } %>
             </td>
 
-            <!-- Remarks -->
             <td><%= log.remarks || '' %></td>
           </tr>
         <% }) %>
       <% } else { %>
         <tr>
-          <td colspan="8" class="text-center text-muted">
-            No audit log entries found.
-          </td>
+          <td colspan="8" class="text-center text-muted">No audit log entries found.</td>
         </tr>
       <% } %>
     </tbody>
   </table>
 
-  <a href="/deliveries" class="btn btn-secondary">Back to Deliveries</a>
+  <!-- PAGINATION CONTROLS -->
+  <nav class="d-flex justify-content-center mt-3" aria-label="Audit pagination">
+    <ul class="pagination pagination-sm">
+
+      <!-- Prev -->
+      <li class="page-item <%= (page <= 1 ? 'disabled' : '') %>">
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.max(1, page - 1) }) %>">Prev</a>
+      </li>
+
+      <!-- Page numbers (compact) -->
+      <%
+        // show up to 7 pages around current
+        const start = Math.max(1, page - 3);
+        const end = Math.min(totalPages, page + 3);
+      %>
+
+      <% if (start > 1) { %>
+        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: 1 }) %>">1</a></li>
+        <% if (start > 2) { %>
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        <% } %>
+      <% } %>
+
+      <% for (let p = start; p <= end; p++) { %>
+        <li class="page-item <%= (p === page ? 'active' : '') %>">
+          <a class="page-link" href="/auditLog?<%= buildQuery({ page: p }) %>"><%= p %></a>
+        </li>
+      <% } %>
+
+      <% if (end < totalPages) { %>
+        <% if (end < totalPages - 1) { %>
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        <% } %>
+        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: totalPages }) %>"><%= totalPages %></a></li>
+      <% } %>
+
+      <!-- Next -->
+      <li class="page-item <%= (page >= totalPages ? 'disabled' : '') %>">
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.min(totalPages, page + 1) }) %>">Next</a>
+      </li>
+
+    </ul>
+  </nav>
+
+  <a href="/deliveries" class="btn btn-secondary mt-3">Back to Deliveries</a>
 
   <footer class="bg-dark text-white py-3 mt-4">
     <div class="container text-center">
       <p class="mb-0 text-sm">&copy; Placeholder TXT</p>
     </div>
   </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <script>
+  document.getElementById("exportExcel").addEventListener("click", () => {
+      const table = document.querySelector("table");
+      const ws = XLSX.utils.table_to_sheet(table);
+
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 }); // column A
+          const cell = ws[cellRef];
+
+          if (cell?.v) {
+              const dateObj = new Date(cell.v);
+              if (!isNaN(dateObj.getTime())) {
+                  cell.v = dateObj;
+                  cell.t = "d";
+                  cell.z = "yyyy-mm-dd hh:mm:ss";
+              }
+          }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Audit Logs");
+      XLSX.writeFile(wb, "audit_logs.xlsx");
+  });
+  </script>
 </body>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-
-
-<script>
-document.getElementById("exportExcel").addEventListener("click", () => {
-    const table = document.querySelector("table");
-
-    // Convert HTML table to sheet
-    const ws = XLSX.utils.table_to_sheet(table);
-
-    const range = XLSX.utils.decode_range(ws["!ref"]);
-
-    // Convert column A (timestamp column) to real Date objects
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 }); // A column
-        const cell = ws[cellRef];
-
-        if (cell?.v) {
-            const dateStr = cell.v; // "2025-02-06 15:23:51"
-
-            // Convert to Excel date
-            const dateObj = new Date(dateStr);
-
-            if (!isNaN(dateObj.getTime())) {
-                cell.v = dateObj;     // assign Date
-                cell.t = "d";         // mark as date
-                cell.z = "yyyy-mm-dd hh:mm:ss"; // desired display format
-            }
-        }
-    }
-
-    // Create workbook and save
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Audit Logs");
-    XLSX.writeFile(wb, "audit_logs.xlsx");
-});
-</script>
-
-
-
 </html>
+
