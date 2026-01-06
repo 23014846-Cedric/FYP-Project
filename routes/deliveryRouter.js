@@ -1,15 +1,15 @@
 // routes/deliveryRouter.js
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const crypto = require('crypto'); // ✅ NEW (batch/session id)
+const crypto = require("crypto"); // ✅ needed for randomUUID()
+const { addAuditLog } = require("../utils/audit");
 
-const CardDelivery = require('../models/CardDelivery');
-const AuditLog = require('../models/AuditLog');
+const CardDelivery = require("../models/CardDelivery");
 
-const multer = require('multer');
-const xlsx = require('xlsx');
-const { body, validationResult } = require('express-validator');
+const multer = require("multer");
+const xlsx = require("xlsx");
+const { body, validationResult } = require("express-validator");
 
 // Multer: temporary upload folder
 const upload = multer({ dest: 'uploads/' });
@@ -23,41 +23,6 @@ function last4(card) {
   return clean.slice(-4);
 }
 
-// Inline helper: write an audit log entry
-async function addAuditLog(
-  req,
-  {
-    action_type,
-    entity_type,
-    entity_id,
-    field = null,
-    old_value = null,
-    new_value = null,
-    source = 'Web',
-    remarks = '',
-  }
-) {
-  try {
-    const user = req.user || null;
-
-    await AuditLog.create({
-      username: user ? user.name : 'System',
-      user_id: user ? user.id : null,
-      action_type,
-      entity_type,
-      entity_id,
-      field,
-      old_value:
-        old_value !== undefined && old_value !== null ? String(old_value) : null,
-      new_value:
-        new_value !== undefined && new_value !== null ? String(new_value) : null,
-      source,
-      remarks,
-    });
-  } catch (err) {
-    console.error('Error writing audit log:', err);
-  }
-}
 
 // Reusable validation rules for a single delivery (FR24)
 const deliveryValidationRules = [

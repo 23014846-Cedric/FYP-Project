@@ -23,6 +23,7 @@ const operationsRouter = require("./routes/operationsRouter");
 const adminRouter = require("./routes/adminRouter");
 const printerRouter = require("./routes/printerRouter");
 const revealRouter = require("./routes/revealRouter");
+const auditApiRouter = require("./routes/auditApiRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -58,6 +59,11 @@ app.use((req, res, next) => {
   res.locals.maskAddress = maskAddress;
   next();
 });
+
+// -------------------- ROUTER MOUNTING --------------------
+
+// Mount audit API router
+app.use(auditApiRouter);
 
 // Mount reveal router
 app.use(revealRouter);
@@ -100,6 +106,9 @@ app.get('/login',   (req, res) => res.render('login',   { errors: [] }));
 app.get('/signup',  (req, res) => res.render('signup',  { errors: [], formData: {} }));
 app.get('/about',   (req, res) => res.render('about',   { errors: [], formData: {} }));
 app.get('/profile', authMiddleware, (req, res) => res.render('profile'));
+app.get("/auditDemo", authMiddleware, (req, res) => {
+  res.render("auditDemo");
+});
 
 
 app.get('/errorDiagnostics', authMiddleware, async (req, res) => {

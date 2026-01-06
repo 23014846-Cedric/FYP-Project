@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
+const { addAuditLog } = require("../utils/audit");
 
 const SALT = 10;
 
@@ -122,15 +123,13 @@ exports.signin = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    // Log login event
-    await AuditLog.create({
-      username: user.name,
-      user_id: user._id,
+    // Log login event (hashed for blockchain anchoring)
+    await addAuditLog(req, {
       action_type: "LOGIN",
       entity_type: "User",
-      entity_id: user._id,
+      entity_id: String(user._id),
       source: "Web",
-      remarks: "User logged in"
+      remarks: "User logged in",
     });
 
     // Decide redirect path ONCE based on role
@@ -162,14 +161,13 @@ exports.signin = async (req, res) => {
 exports.logout = async(req, res) => {
   res.clearCookie("token");
   if (req.user) {
-    await AuditLog.create({
-      username: req.user.name,
-      user_id: req.user._id,
+    // Log logout event (hashed for blockchain anchoring)
+    await addAuditLog(req, {
       action_type: "LOGOUT",
       entity_type: "User",
-      entity_id: req.user._id,
+      entity_id: req.user?.id ? String(req.user.id) : null,
       source: "Web",
-      remarks: "User logged out"
+      remarks: "User logged out",
     });
   }
   res.redirect("/login");
@@ -194,18 +192,17 @@ exports.updateUserRole = async (req, res) => {
     await user.save();
 
     // ADDED: Log role update
-    await AuditLog.create({
-      username: req.user.name,
-      user_id: req.user._id,
-      action_type: "ROLE_UPDATE",
-      entity_type: "User",
-      entity_id: user._id,
-      field: "role",
-      old_value: oldRole,
-      new_value: newRole,
-      source: "Web",
-      remarks: "Admin changed user role"
-    });
+  await addAuditLog(req, {
+    action_type: "ROLE_UPDATE",
+    entity_type: "User",
+    entity_id: String(user._id),
+    field: "role",
+    old_value: oldRole,
+    new_value: newRole,
+    source: "Web",
+    remarks: "Admin changed user role"
+  });
+
 
     res.redirect("/admin/users");
   } catch (err) {

@@ -1,64 +1,32 @@
-// models/AuditLog.js
 const mongoose = require('mongoose');
 
 const auditLogSchema = new mongoose.Schema({
-  timestamp: {
-    type: Date,
-    default: Date.now,
-  },
+timestamp: { type: Date, default: Date.now,},
 
-  username: {
-    type: String,
-    default: 'System',
-  },
+  username: { type: String, default: 'System' },
+  user_id: { type: String },
 
-  user_id: {
-    type: String,
-  },
+  action_type: { type: String, required: true },
+  entity_type: { type: String, required: true },
+  entity_id: { type: String, default: null },
 
-  action_type: {
-    type: String,          // e.g. UPDATE_STATUS, IMPORT_DELIVERIES, CREATE_DELIVERY
-    required: true,
-  },
+  field: { type: String },
+  old_value: { type: String },
+  new_value: { type: String },
 
-  entity_type: {
-    type: String,          // e.g. "CardDelivery", "User"
-    // keep required if you want, or relax it too:
-    required: true,
-  },
+  source: { type: String, default: 'Web' },
+  remarks: { type: String },
 
-  entity_id: {
-    type: String,
-    required: false,
-    default: null,
-  },
-
-  field: {
-    type: String,          // e.g. "status"
-  },
-
-  old_value: {
-    type: String,
-  },
-
-  new_value: {
-    type: String,
-  },
-
-  source: {
-    type: String,
-    default: 'Web',
-  },
-
-  remarks: {
-    type: String,
-  },
+  // NEW hybrid-blockchain fields
+  summaryString: { type: String },
+  logHash: { type: String, index: true }, // 0x + sha256 hex
+  txHash: { type: String },              // ethereum tx hash
 });
 
-// Auto-delete audit logs 90 days after timestamp
+// ✅ auto-delete after 90 days
 auditLogSchema.index(
   { timestamp: 1 },
-  { expireAfterSeconds: 90 * 24 * 60 * 60 }  // 90 days
+  { expireAfterSeconds: 90 * 24 * 60 * 60 }
 );
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);

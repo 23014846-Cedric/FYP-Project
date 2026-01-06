@@ -2,28 +2,31 @@
 <html>
 <head>
   <title>System Activity Log – Audit Trail</title>
-    <!-- Bootstrap -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
+
 <body class="p-4">
   <%- include("partials/navbar") %>
+
   <%
-  function getRowColor(action) {
-    if (action === "UPDATE_STATUS") return "table-success"; // green
-    if (action === "LOGIN" || action === "LOGOUT") return "table-warning"; // yellow
-    if (action === "ROLE_UPDATE" || action === "IMPORT_DELIVERIES") return "table-danger"; // red
-    return "";
-  }
-%>
+    function getRowColor(action) {
+      if (action === "UPDATE_STATUS") return "table-success"; // green
+      if (action === "LOGIN" || action === "LOGOUT") return "table-warning"; // yellow
+      if (action === "ROLE_UPDATE" || action === "IMPORT_DELIVERIES") return "table-danger"; // red
+      return "";
+    }
+  %>
 
   <div class="sidebar-hover-zone"></div>
   <%- include("partials/sidebar") %>
-    
+
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>System Activity Log</h1>
   </div>
 
   <button id="exportExcel" class="btn btn-success mb-3">Export to Excel</button>
+
   <table class="table table-bordered table-striped table-sm align-middle">
     <thead class="table-dark">
       <tr>
@@ -35,8 +38,13 @@
         <th>Source</th>
         <th>Old → New (What changed)</th>
         <th>Remarks</th>
+
+        <!-- ✅ NEW -->
+        <th>Blockchain</th>
+        <th>Tx Hash</th>
       </tr>
     </thead>
+
     <tbody>
       <% if (logs && logs.length > 0) { %>
         <% logs.forEach(log => { %>
@@ -92,11 +100,41 @@
 
             <!-- Remarks -->
             <td><%= log.remarks || '' %></td>
+
+            <!-- ✅ Blockchain Status -->
+            <td style="min-width: 170px;">
+              <% if (log.txHash) { %>
+                <span class="badge bg-success">Anchored ✅</span>
+              <% } else if (log.logHash) { %>
+                <button
+                  class="btn btn-sm btn-outline-primary anchor-btn"
+                  data-id="<%= log._id %>"
+                  data-hash="<%= log.logHash %>"
+                  data-action="<%= log.action_type || 'UNKNOWN' %>">
+                  Anchor to Ganache
+                </button>
+                <div class="small text-muted mt-1">
+                  Hash: <code><%= log.logHash %></code>
+                </div>
+              <% } else { %>
+                <span class="text-muted">No hash</span>
+              <% } %>
+            </td>
+
+            <!-- ✅ Tx Hash -->
+            <td style="max-width: 260px; font-size: 0.78rem;">
+              <% if (log.txHash) { %>
+                <code><%= log.txHash %></code>
+              <% } else { %>
+                <span class="text-muted">-</span>
+              <% } %>
+            </td>
+
           </tr>
         <% }) %>
       <% } else { %>
         <tr>
-          <td colspan="8" class="text-center text-muted">
+          <td colspan="10" class="text-center text-muted">
             No audit log entries found.
           </td>
         </tr>
@@ -111,46 +149,128 @@
       <p class="mb-0 text-sm">&copy; Placeholder TXT</p>
     </div>
   </footer>
-</body>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
+  <!-- XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
+  <!-- ✅ Ethers (v5 works best with Ganache + MetaMask) -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
-<script>
-document.getElementById("exportExcel").addEventListener("click", () => {
-    const table = document.querySelector("table");
+  <script>
+    // ✅ Paste your deployed Ganache contract address here
+    const CONTRACT_ADDRESS = "0xF9cC401278b0Cd6a1Ebe54282B0015b0cA0aF7D1";
 
-    // Convert HTML table to sheet
-    const ws = XLSX.utils.table_to_sheet(table);
+    // ABI for logAudit + event (works for both "event-only" and "mapping" contract)
+    const CONTRACT_ABI = [
+      {
+        "anonymous": false,
+        "inputs": [
+          { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+          { "indexed": true, "internalType": "bytes32", "name": "logHash", "type": "bytes32" },
+          { "indexed": false, "internalType": "string", "name": "actionType", "type": "string" },
+          { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        ],
+        "name": "AuditLogged",
+        "type": "event"
+      },
+      {
+        "inputs": [
+          { "internalType": "bytes32", "name": "logHash", "type": "bytes32" },
+          { "internalType": "string", "name": "actionType", "type": "string" }
+        ],
+        "name": "logAudit",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ];
 
-    const range = XLSX.utils.decode_range(ws["!ref"]);
+    async function anchorLog(auditLogId, logHash, actionType, buttonEl) {
+      if (!window.ethereum) {
+        alert("MetaMask not detected. Please install MetaMask.");
+        return;
+      }
 
-    // Convert column A (timestamp column) to real Date objects
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 }); // A column
-        const cell = ws[cellRef];
+      if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS.includes("PASTE_")) {
+        alert("You must paste your CONTRACT_ADDRESS into auditLog.ejs first.");
+        return;
+      }
 
-        if (cell?.v) {
-            const dateStr = cell.v; // "2025-02-06 15:23:51"
+      // Connect MetaMask
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
 
-            // Convert to Excel date
-            const dateObj = new Date(dateStr);
+      const signer = provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
-            if (!isNaN(dateObj.getTime())) {
-                cell.v = dateObj;     // assign Date
-                cell.t = "d";         // mark as date
-                cell.z = "yyyy-mm-dd hh:mm:ss"; // desired display format
-            }
-        }
+      // Optional: show some UI feedback
+      if (buttonEl) {
+        buttonEl.disabled = true;
+        buttonEl.textContent = "Anchoring...";
+      }
+
+      // Send tx to Ganache
+      // Gas limit is set to avoid estimateGas issues on some Ganache setups
+      const tx = await contract.logAudit(logHash, actionType, { gasLimit: 200000 });
+      const receipt = await tx.wait();
+
+      const txHash = receipt.transactionHash;
+
+      // Save txHash back to MongoDB
+      const res = await fetch(`/api/audit/${auditLogId}/tx`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txHash })
+      });
+
+      if (!res.ok) {
+        const msg = await res.text();
+        alert("Saved on-chain but failed to update DB: " + msg);
+        return;
+      }
+
+      // Reload to show “Anchored ✅”
+      window.location.reload();
     }
 
-    // Create workbook and save
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Audit Logs");
-    XLSX.writeFile(wb, "audit_logs.xlsx");
-});
-</script>
+    // Attach button listeners
+    document.querySelectorAll(".anchor-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          await anchorLog(btn.dataset.id, btn.dataset.hash, btn.dataset.action, btn);
+        } catch (err) {
+          console.error(err);
+          alert(err?.message || String(err));
+          btn.disabled = false;
+          btn.textContent = "Anchor to Ganache";
+        }
+      });
+    });
 
+    // Excel export (your existing logic)
+    document.getElementById("exportExcel").addEventListener("click", () => {
+      const table = document.querySelector("table");
+      const ws = XLSX.utils.table_to_sheet(table);
+      const range = XLSX.utils.decode_range(ws["!ref"]);
 
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 });
+        const cell = ws[cellRef];
+        if (cell?.v) {
+          const dateObj = new Date(cell.v);
+          if (!isNaN(dateObj.getTime())) {
+            cell.v = dateObj;
+            cell.t = "d";
+            cell.z = "yyyy-mm-dd hh:mm:ss";
+          }
+        }
+      }
 
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Audit Logs");
+      XLSX.writeFile(wb, "audit_logs.xlsx");
+    });
+  </script>
+
+</body>
 </html>

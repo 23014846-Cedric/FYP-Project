@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const authMiddleware = require("../middleware/authMiddleware");
 const AuditLog = require("../models/AuditLog");
+const { addAuditLog } = require("../utils/audit");
 
 // Printer submits an admin password to temporarily reveal sensitive fields
 router.post("/reveal/request", authMiddleware, async (req, res) => {
@@ -47,14 +48,11 @@ router.post("/reveal/request", authMiddleware, async (req, res) => {
       maxAge: 5 * 60 * 1000
     });
 
-    // Audit log this sensitive reveal
-    await AuditLog.create({
-      timestamp: new Date(),
-      username: req.user.name,
-      user_id: req.user.id,
+    // Audit log this sensitive reveal (hashed for blockchain anchoring)
+    await addAuditLog(req, {
       action_type: "SENSITIVE_REVEAL_GRANTED",
       entity_type: "DeliveryData",
-      entity_id: null,
+      entity_id: null, // no specific delivery ID
       source: "Web",
       remarks: "Printer obtained temporary access to full card/address via step-up auth"
     });
