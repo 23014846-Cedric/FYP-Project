@@ -139,32 +139,32 @@
             </td>
 
             <!-- Blockchain -->
-            <td style="min-width: 200px;">
-              <% if (log.txHash) { %>
+            <td style="min-width: 220px;">
+              <% if (log.anchored && log.anchor_tx) { %>
                 <span class="badge bg-success">Anchored ✅</span>
-              <% } else if (log.logHash) { %>
-                <button
-                  class="btn btn-sm btn-outline-primary anchor-btn"
-                  data-id="<%= log._id %>"
-                  data-hash="<%= log.logHash %>"
-                  data-action="<%= log.action_type || 'UNKNOWN' %>">
-                  Anchor to Ganache
-                </button>
-                <div class="small text-muted mt-1">Hash: <code><%= log.logHash %></code></div>
+                <div class="small text-muted mt-1">
+                  root: <code><%= (log.anchor_root || "").slice(0, 10) %>…</code>
+                </div>
+              <% } else if (log.hash) { %>
+                <span class="badge bg-warning text-dark">Hashed (pending anchor)</span>
+                <div class="small text-muted mt-1">
+                  hash: <code><%= log.hash.slice(0, 10) %>…</code><br/>
+                  prev: <code><%= log.prev_hash ? log.prev_hash.slice(0, 10) + "…" : "-" %></code>
+                </div>
               <% } else { %>
                 <span class="text-muted">No hash</span>
               <% } %>
             </td>
 
+            <!-- Tx Hash -->
             <td style="max-width: 260px; font-size: 0.78rem;">
-              <% if (log.txHash) { %>
-                <code><%= log.txHash %></code>
+              <% if (log.anchor_tx) { %>
+                <code><%= log.anchor_tx %></code>
               <% } else { %>
                 <span class="text-muted">-</span>
               <% } %>
             </td>
           </tr>
-
           <!-- COLLAPSE ROW (IMPORT ONLY) -->
           <% if (isImport) { %>
             <tr>

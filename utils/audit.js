@@ -42,14 +42,12 @@ async function addAuditLog(req, payload) {
       action_type: payload.action_type,
       entity_type: payload.entity_type,
       entity_id: payload.entity_id,
+      import_batch_id: payload.import_batch_id || null,   // ✅ this is the key
       field: payload.field || null,
       old_value: safeOld || null,
       new_value: safeNew || null,
       source: payload.source || "Web",
       remarks: payload.remarks || "",
-      import_batch_id: payload.import_batch_id || null,
-      summaryString,
-      logHash,
     });
 
     return log;

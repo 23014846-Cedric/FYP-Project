@@ -1,5 +1,5 @@
 // app.js
-require('dotenv').config();
+require("dotenv").config({ override: true });
 
 const express       = require('express');
 const mongoose      = require('mongoose');
@@ -35,6 +35,10 @@ const revealMiddleware = require("./middleware/revealMiddleware");
 const app  = express();
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGODB_URI;
+
+// -------------------- BACKGROUND JOBS --------------------
+const startAnchorJob = require("./jobs/anchorAuditJob");
+startAnchorJob();
 
 // -------------------- CORE MIDDLEWARE --------------------
 
