@@ -15,6 +15,8 @@ const cardDeliverySchema = new mongoose.Schema(
     courier: { type: String, trim: true, default: "-" },
     status: { type: String, enum: STATUS, default: "Pending" },
     updated_at: { type: Date, default: Date.now },
+    
+    assigned_printer: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
 
     import_batch_id: { type: String, index: true },
     imported_by: { type: String }, // user id/email/name

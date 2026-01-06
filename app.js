@@ -156,9 +156,9 @@ app.get("/dashboard", authMiddleware, async (req, res) => {
 
     // Role-based filter (keep consistent with what user can see)
     const filter =
-      req.user.role === "admin" || req.user.role === "operations"
-        ? {}
-        : { recipient_name: req.user.name };
+  (req.user.role === "admin" || req.user.role === "operations")
+    ? {}
+    : { assigned_printer: req.user._id };
 
     const total = await CardDelivery.countDocuments(filter);
     const totalPages = Math.max(Math.ceil(total / limit), 1);
