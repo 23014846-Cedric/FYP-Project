@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 const auditLogSchema = new mongoose.Schema({
 timestamp: { type: Date, default: Date.now,},
 
+  import_batch_id: { type: String, index: true },
+  
   username: { type: String, default: 'System' },
   user_id: { type: String },
 

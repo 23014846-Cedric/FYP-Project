@@ -198,10 +198,13 @@ function pickCardNumber(row) {
 //routes
 router.get('/', async (req, res) => {
   try {
-    const batchId = req.cookies.last_import_batch;
+    const batchId = req.query.batchId;
 
     if (!batchId) {
-      return res.render('deliveries', { deliveries: [] });
+      return res.render('deliveries', {
+        deliveries: [],
+        batchId: null
+      });
     }
 
     let deliveries = await CardDelivery.find({ import_batch_id: batchId })
@@ -322,17 +325,13 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
       `[Import] Successfully inserted ${result.length} deliveries. Invalid rows: ${invalidCount}`
     );
 
-    // ✅ Remember this batch in the current browser session
-    res.cookie('last_import_batch', batchId, {
-      httpOnly: true,
-      sameSite: 'lax',
-      // secure: true, // enable in production over HTTPS
-    });
+    res.redirect(`/deliveries?batchId=${batchId}`);
 
     await addAuditLog(req, {
       action_type: 'IMPORT_DELIVERIES',
       entity_type: 'CardDelivery',
       entity_id: 'BULK',
+      import_batch_id: batchId,
       source: 'Deliveries Import',
       remarks: `Imported ${result.length} deliveries from Excel. Skipped ${invalidCount} invalid rows. Batch: ${batchId}`,
     });

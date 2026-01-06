@@ -9,9 +9,9 @@
   <%- include("partials/navbar") %>
   <div class="sidebar-hover-zone"></div>
   <%- include("partials/sidebar") %>
-
+  <br>
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Deliveries</h1>
+    <h1>Import Deliveries</h1>
 
     <!-- Optional: Clear current session import -->
     <form method="POST" action="/deliveries/clear-session" class="m-0">
@@ -20,7 +20,8 @@
       </button>
     </form>
   </div>
-
+  <br>
+  
   <!-- Excel Import Card -->
   <div class="card mb-4">
     <div class="card-header fw-bold">
@@ -50,6 +51,11 @@
       </form>
     </div>
   </div>
+  <% if (batchId) { %>
+    <div class="alert alert-info">
+      Viewing import batch: <code><%= batchId %></code>
+    </div>
+  <% } %>
 
   <!-- Filters & Controls -->
     <div class="card mb-3">

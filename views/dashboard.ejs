@@ -38,9 +38,6 @@
 
     .stat-number { font-size: 2rem; font-weight: 800; line-height: 1; }
 
-    tr.clickable-row { cursor: pointer; }
-    tr.clickable-row:hover { background-color: #e7f1ff !important; }
-
     .table th { white-space: nowrap; }
   </style>
 </head>
@@ -135,7 +132,6 @@
             <% } %>
           <% } %>
 
-          <a href="/deliveries" class="btn btn-sm btn-outline-primary">View All</a>
         </div>
       </div>
 
@@ -155,13 +151,12 @@
           <tbody>
             <% if (deliveries && deliveries.length > 0) { %>
               <% deliveries.forEach(d => { %>
-                <tr class="clickable-row
-                  <%= d.status === 'Delivered' ? 'table-success'
-                    : d.status === 'Shipped' ? 'table-warning'
-                    : d.status === 'Failed' ? 'table-danger'
-                    : '' %>"
-                  onclick="window.location='/deliveries'">
-
+                <tr class="
+                    <%= d.status === 'Delivered' ? 'table-success'
+                      : d.status === 'Shipped' ? 'table-warning'
+                      : d.status === 'Failed' ? 'table-danger'
+                      : '' %>"
+                >
                   <!-- Card Number -->
                   <td class="text-center fw-semibold">
                     <% const revealAllowed = (user && (user.role === "admin" || user.role === "operations")) || (typeof canRevealSensitive !== 'undefined' && canRevealSensitive); %>
@@ -214,7 +209,51 @@
           </tbody>
         </table>
       </div>
+      <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+        <nav class="mt-3" aria-label="Deliveries pagination">
+          <ul class="pagination pagination-sm justify-content-end mb-0">
+
+            <!-- Prev -->
+            <li class="page-item <%= (page <= 1 ? 'disabled' : '') %>">
+              <a class="page-link" href="?page=<%= Math.max(1, page - 1) %>">Prev</a>
+            </li>
+
+            <!-- Page numbers (compact) -->
+            <% 
+              const start = Math.max(1, page - 2);
+              const end = Math.min(totalPages, page + 2);
+            %>
+
+            <% if (start > 1) { %>
+              <li class="page-item"><a class="page-link" href="?page=1">1</a></li>
+              <% if (start > 2) { %>
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+              <% } %>
+            <% } %>
+
+            <% for (let p = start; p <= end; p++) { %>
+              <li class="page-item <%= (p === page ? 'active' : '') %>">
+                <a class="page-link" href="?page=<%= p %>"><%= p %></a>
+              </li>
+            <% } %>
+
+            <% if (end < totalPages) { %>
+              <% if (end < totalPages - 1) { %>
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+              <% } %>
+              <li class="page-item"><a class="page-link" href="?page=<%= totalPages %>"><%= totalPages %></a></li>
+            <% } %>
+
+            <!-- Next -->
+            <li class="page-item <%= (page >= totalPages ? 'disabled' : '') %>">
+              <a class="page-link" href="?page=<%= Math.min(totalPages, page + 1) %>">Next</a>
+            </li>
+
+          </ul>
+        </nav>
+      <% } %>
     </div>
+    <a class="page-link" href="?page=<%= Math.max(1, page - 1) %>">Prev</a>
 
   </main>
 

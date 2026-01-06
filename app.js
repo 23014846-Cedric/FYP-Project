@@ -133,37 +133,58 @@ app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
 
 // Protected dashboard (any logged-in user)
 // Protected dashboard
+// Protected dashboard (any logged-in user)
 app.get('/dashboard', authMiddleware, async (req, res) => {
   try {
-    let deliveries;
+    // Role check
+    if (!req.user || !['admin', 'operations', 'printer'].includes(req.user.role)) {
+      return res.status(403).send('Access denied');
+    }
 
-  // Admin, Operations, Printer all see ALL deliveries
-  if (req.user && ['admin', 'operations', 'printer'].includes(req.user.role)) {
-    deliveries = await CardDelivery.find().lean();
-  } else {
-    return res.status(403).send('Access denied');
-  }
+    // Pagination params
+    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+    const limit = 10; // change to 20 if you want more rows per page
+    const skip = (page - 1) * limit;
+
+    // Total count for pagination
+    const total = await CardDelivery.countDocuments();
+
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+
+    // Fetch only current page (sorted newest first)
+    const deliveries = await CardDelivery.find()
+      .sort({ updated_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Stats (DB counts - faster than loading all deliveries)
+    const deliveredCount = await CardDelivery.countDocuments({ status: 'Delivered' });
+    const inTransitCount = await CardDelivery.countDocuments({ status: 'Shipped' }); // adjust if you use another status
+    const exceptionsCount = await CardDelivery.countDocuments({ status: { $in: ['Failed', 'Delayed'] } });
 
     const stats = {
-      total: deliveries.length,
-      delivered: deliveries.filter(d => d.status === 'Delivered').length,
-      inTransit: deliveries.filter(d => d.status === 'Shipped').length,
-      exceptions: deliveries.filter(
-        d => d.status === 'Failed' || d.status === 'Delayed'
-      ).length,
+      total,
+      delivered: deliveredCount,
+      inTransit: inTransitCount,
+      exceptions: exceptionsCount,
     };
 
-    res.render('dashboard', {
+    return res.render('dashboard', {
       user: req.user,
       deliveries,
       stats,
+      page,
+      totalPages,
     });
   } catch (err) {
     console.error('Error loading dashboard:', err);
-    res.render('dashboard', {
+    return res.render('dashboard', {
       user: req.user,
       deliveries: [],
       stats: { total: 0, delivered: 0, inTransit: 0, exceptions: 0 },
+      page: 1,
+      totalPages: 1,
     });
   }
 });

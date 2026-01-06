@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
+const CardDelivery = require("../models/CardDelivery");
 const AuditLog = require("../models/AuditLog");
 const authMiddleware = require("../middleware/authMiddleware");
 const { addAuditLog } = require("../utils/audit");
@@ -47,4 +48,22 @@ router.post("/api/audit/sample", authMiddleware, async (req, res) => {
   }
 });
 
+router.get("/api/import-batch/:batchId", authMiddleware, async (req, res) => {
+  try {
+    const { batchId } = req.params;
+
+    // Optional: limit to avoid rendering huge tables
+    const limit = Math.min(parseInt(req.query.limit || "50", 10), 200);
+
+    const deliveries = await CardDelivery.find({ import_batch_id: batchId })
+      .sort({ imported_at: -1 })
+      .limit(limit)
+      .lean();
+
+    return res.json({ ok: true, deliveries });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: "Failed to load batch deliveries" });
+  }
+});
 module.exports = router;
