@@ -18,6 +18,28 @@
       return "";
     }
   %>
+  <%
+    // Build query string for pagination while preserving existing filters
+    function buildQuery(overrides = {}) {
+      const params = new URLSearchParams();
+
+      // Preserve known filters if controller passed them
+      if (typeof page !== "undefined" && page) params.set("page", String(page));
+      if (typeof q !== "undefined" && q) params.set("q", String(q));
+      if (typeof action !== "undefined" && action) params.set("action", String(action));
+      if (typeof entity !== "undefined" && entity) params.set("entity", String(entity));
+      if (typeof batchId !== "undefined" && batchId) params.set("batchId", String(batchId));
+      if (typeof anchored !== "undefined" && anchored) params.set("anchored", String(anchored));
+
+      // Apply overrides (e.g. change page)
+      for (const [k, v] of Object.entries(overrides)) {
+        if (v === null || v === undefined || v === "") params.delete(k);
+        else params.set(k, String(v));
+      }
+
+      return params.toString();
+    }
+  %>
 
   <div class="sidebar-hover-zone"></div>
   <%- include("partials/sidebar") %>
