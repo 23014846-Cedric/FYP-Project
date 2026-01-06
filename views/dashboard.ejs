@@ -39,6 +39,70 @@
     .stat-number { font-size: 2rem; font-weight: 800; line-height: 1; }
 
     .table th { white-space: nowrap; }
+    /* Status cards */
+    .status-card {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(15,23,42,0.08);
+      border-radius: 16px;
+      padding: 18px 18px 16px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .status-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 16px 36px rgba(0,0,0,0.14);
+      border-color: rgba(13,110,253,0.25);
+    }
+
+    .status-topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 6px;
+      width: 100%;
+      opacity: 0.9;
+    }
+
+    .status-name {
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      color: #0f172a;
+      margin: 2px 0 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-count {
+      font-size: 2.15rem;
+      font-weight: 900;
+      line-height: 1;
+      color: #0f172a;
+      margin: 0;
+    }
+
+    .status-meta {
+      margin-top: 10px;
+      font-size: 0.82rem;
+      color: rgba(15,23,42,0.55);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(13,110,253,0.08);
+      color: rgba(13,110,253,1);
+      border: 1px solid rgba(13,110,253,0.18);
+    }
   </style>
 </head>
 
@@ -57,32 +121,46 @@
 
     <!-- Stats Row (Clickable) -->
     <div class="row g-3">
-      <div class="col-12 col-sm-6 col-lg-3">
-        <a class="text-decoration-none text-dark">
-          <div class="card-box text-center h-100">
-            <p class="text-muted mb-2">Total Deliveries</p>
-            <p class="stat-number mb-0"><%= stats ? stats.total : 0 %></p>
-          </div>
-        </a>
-      </div>
+      <% 
+        const colorMap = {
+          "Delivered": "linear-gradient(90deg, #198754, #20c997)",
+          "Pending": "linear-gradient(90deg, #0d6efd, #4dabf7)",
+          "Handed to Courier": "linear-gradient(90deg, #6f42c1, #b197fc)",
+          "Reprocessing": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Failed": "linear-gradient(90deg, #dc3545, #ff6b6b)",
+          "Pulled Out": "linear-gradient(90deg, #495057, #adb5bd)",
+          "Not Found": "linear-gradient(90deg, #495057, #adb5bd)",
+          "Returned to Printer": "linear-gradient(90deg, #0dcaf0, #66d9e8)",
+          "Destroyed": "linear-gradient(90deg, #212529, #495057)",
+          "Shipped": "linear-gradient(90deg, #0dcaf0, #66d9e8)"
+        };
+      %>
 
-      <div class="col-12 col-sm-6 col-lg-3">
-        <a href="/deliveries" class="text-decoration-none text-dark">
-          <div class="card-box text-center h-100">
-            <p class="text-muted mb-2">Delivered</p>
-            <p class="stat-number text-success mb-0"><%= stats ? stats.delivered : 0 %></p>
-          </div>
-        </a>
-      </div>
+      <% (statusList || []).forEach(s => { 
+          const count = (statsByStatus && statsByStatus[s]) ? statsByStatus[s] : 0;
+          const bar = colorMap[s] || "linear-gradient(90deg, #0d6efd, #4dabf7)";
+      %>
+        <div class="col-12 col-sm-6 col-lg-3">
+          <a href="/deliveries?status=<%= encodeURIComponent(s) %>" class="text-decoration-none">
+            <div class="status-card h-100">
+              <div class="status-topbar" style="background:<%= bar %>"></div>
 
-      <div class="col-12 col-sm-6 col-lg-3">
-        <a href="/deliveries" class="text-decoration-none text-dark">
-          <div class="card-box text-center h-100">
-            <p class="text-muted mb-2">Pending</p>
-            <p class="stat-number text-success mb-0"><%= stats ? stats.pending : 0 %></p>
-          </div>
-        </a>
-      </div>
+              <div class="d-flex align-items-start justify-content-between gap-2">
+                <div class="status-name" title="<%= s %>"><%= s %></div>
+                <span class="status-pill">View</span>
+              </div>
+
+              <p class="status-count"><%= count %></p>
+
+              <div class="status-meta">
+                <span class="text-nowrap">Records</span>
+                <span class="text-nowrap">→</span>
+              </div>
+            </div>
+          </a>
+        </div>
+      <% }) %>
+    </div>
 
     <!-- Charts Row -->
     <div class="row g-3 mt-4">

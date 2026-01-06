@@ -99,10 +99,10 @@ app.use(importBatchApiRouter);
 
 // Simple admin-only middleware
 function adminMiddleware(req, res, next) {
-  if (req.user && (req.user.role === 'admin' || req.user.role === 'operations')) {
+  if (req.user && (req.user.role === "admin" || req.user.role === "operations")) {
     return next();
   }
-  return res.status(403).send('Access denied. Admins / Operations only.');
+  return res.status(403).send("Access denied. Admin/Operations only.");
 }
 
 
@@ -118,23 +118,20 @@ app.get("/auditDemo", authMiddleware, (req, res) => {
   res.render("auditDemo");
 });
 
-
-app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
-  if (!req.user || req.user.role !== 'operations') {
-    return res.status(403).render('403', {
-      message: 'You do not have permission to access this page.'
+// Error diagnostics page – Operations only
+app.get("/errorDiagnostics", authMiddleware, async (req, res) => {
+  if (!req.user || req.user.role !== "operations") {
+    return res.status(403).render("403", {
+      message: "You do not have permission to access this page.",
     });
   }
 
   try {
-    const logs = await ErrorLog.find()
-      .sort({ createdAt: -1 })   // or timestamp, see note below
-      .lean();
-
-    res.render('errorDiagnostics', { logs });
+    const logs = await ErrorLog.find().sort({ createdAt: -1 }).lean();
+    return res.render("errorDiagnostics", { logs });
   } catch (err) {
-    console.error('Error loading error diagnostics:', err);
-    res.render('errorDiagnostics', { logs: [] });
+    console.error("Error loading error diagnostics:", err);
+    return res.render("errorDiagnostics", { logs: [] });
   }
 });
 
@@ -142,61 +139,83 @@ app.get('/errorDiagnostics', authMiddleware, async (req, res) => {
 // Protected dashboard (any logged-in user)
 // Protected dashboard
 // Protected dashboard (any logged-in user)
-app.get('/dashboard', authMiddleware, async (req, res) => {
+app.get("/dashboard", authMiddleware, async (req, res) => {
   try {
-    // Role check
-    if (!req.user || !['admin', 'operations', 'printer'].includes(req.user.role)) {
-      return res.status(403).send('Access denied');
+    if (!req.user || !["admin", "operations", "printer"].includes(req.user.role)) {
+      return res.status(403).send("Access denied");
     }
 
-    // Pagination params
-    const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-    const limit = 10; // change to 20 if you want more rows per page
+    // Pagination
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const limit = 10;
     const skip = (page - 1) * limit;
 
-    // Total count for pagination
-    const total = await CardDelivery.countDocuments();
+    // Role-based filter (keep consistent with what user can see)
+    const filter =
+      req.user.role === "admin" || req.user.role === "operations"
+        ? {}
+        : { recipient_name: req.user.name };
 
+    const total = await CardDelivery.countDocuments(filter);
     const totalPages = Math.max(Math.ceil(total / limit), 1);
 
-    // Fetch only current page (sorted newest first)
-    const deliveries = await CardDelivery.find()
+    const deliveries = await CardDelivery.find(filter)
       .sort({ updated_at: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    // Stats (DB counts - faster than loading all deliveries)
-    const deliveredCount = await CardDelivery.countDocuments({ status: 'Delivered' });
-    const inTransitCount = await CardDelivery.countDocuments({ status: 'Shipped' }); // adjust if you use another status
-    const exceptionsCount = await CardDelivery.countDocuments({ status: { $in: ['Failed', 'Delayed'] } });
+    // Status list from schema enum (auto-updates if you change CardDelivery.STATUS later)
+    const statusList = CardDelivery.schema.path("status").enumValues || [
+      "Pending",
+      "Shipped",
+      "Delivered",
+      "Failed",
+    ];
 
+    // Count each status in ONE query
+    const grouped = await CardDelivery.aggregate([
+      { $match: filter },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
+    ]);
+
+    const statsByStatus = Object.fromEntries(statusList.map((s) => [s, 0]));
+    for (const row of grouped) {
+      if (row && row._id) statsByStatus[row._id] = row.count;
+    }
+
+    // Keep your existing chart stats too
     const stats = {
       total,
-      delivered: deliveredCount,
-      inTransit: inTransitCount,
-      exceptions: exceptionsCount,
+      delivered: statsByStatus["Delivered"] || 0,
+      inTransit: statsByStatus["Shipped"] || 0,
+      exceptions: Math.max(total - (statsByStatus["Delivered"] || 0), 0),
     };
 
-    return res.render('dashboard', {
+    return res.render("dashboard", {
       user: req.user,
       deliveries,
       stats,
+      statusList,
+      statsByStatus,
       page,
       totalPages,
     });
   } catch (err) {
-    console.error('Error loading dashboard:', err);
-    return res.render('dashboard', {
+    console.error("Error loading dashboard:", err);
+
+    const fallbackStatuses = ["Pending", "Shipped", "Delivered", "Failed"];
+    return res.render("dashboard", {
       user: req.user,
       deliveries: [],
       stats: { total: 0, delivered: 0, inTransit: 0, exceptions: 0 },
+      statusList: fallbackStatuses,
+      statsByStatus: Object.fromEntries(fallbackStatuses.map((s) => [s, 0])),
       page: 1,
       totalPages: 1,
     });
   }
 });
-
 
 // -------------------- ROUTER MOUNTING --------------------
 
@@ -212,6 +231,10 @@ app.use("/operations", operationsRouter);
 
 // Admin-only modules
 app.use("/admin",authMiddleware, adminRouter);
+
+// Deliveries routes (admin only)
+app.use("/deliveries", authMiddleware, adminMiddleware, deliveryRouter);
+app.use("/exceptions", authMiddleware, adminMiddleware, exceptionRouter);
 
 // Printer routes (Idemia only)
 app.use(

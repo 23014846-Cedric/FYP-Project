@@ -195,36 +195,39 @@ function pickCardNumber(row) {
   return '';
 }
 
-//routes
-router.get('/', async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const batchId = req.query.batchId || null;
+    const status = req.query.status || null;
 
-    if (!batchId) {
-      return res.render('deliveries', {
-        deliveries: [],
-        batchId: null
-      });
+    // Build dynamic filter
+    const filter = {};
+    if (batchId) filter.import_batch_id = batchId;
+    if (status) filter.status = status;
+
+    let deliveries = [];
+    if (batchId || status) {
+      deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).lean();
+    } else {
+      deliveries = await CardDelivery.find({}).sort({ updated_at: -1 }).limit(100).lean();
     }
 
-    let deliveries = await CardDelivery.find({ import_batch_id: batchId })
-      .sort({ updated_at: -1 })
-      .lean();
-
-    deliveries = deliveries.map(d => ({
+    deliveries = deliveries.map((d) => ({
       ...d,
       id: d._id.toString(),
     }));
 
-    return res.render('deliveries', {
+    return res.render("deliveries", {
       deliveries,
-      batchId   // ✅ IMPORTANT
+      batchId,
+      selectedStatus: status,
     });
   } catch (err) {
-    console.error('Error fetching deliveries:', err);
-    return res.status(500).send('Error loading deliveries');
+    console.error("Error fetching deliveries:", err);
+    return res.status(500).send("Error loading deliveries");
   }
 });
+
 
 
 router.post('/', deliveryValidationRules, async (req, res) => {
