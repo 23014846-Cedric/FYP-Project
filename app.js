@@ -221,6 +221,120 @@ app.get("/dashboard", authMiddleware, async (req, res) => {
   }
 });
 
+// ===== AUDIT LOG (with filters) =====
+const AuditLog = require("./models/AuditLog");
+
+app.get("/auditLog", authMiddleware, async (req, res) => {
+  try {
+    // admin-only (adjust if needed)
+    if (!req.user || req.user.role !== "admin") return res.status(403).send("Access denied");
+
+    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
+    const perPage = Math.min(Math.max(parseInt(req.query.perPage || "20", 10), 5), 100);
+    const skip = (page - 1) * perPage;
+
+    const q = (req.query.q || "").trim();
+    const action = (req.query.action || "").trim();
+    const entity = (req.query.entity || "").trim();
+    const batchId = (req.query.batchId || "").trim();
+    const anchored = (req.query.anchored || "").trim(); // "anchored" | "pending" | ""
+
+    const from = (req.query.from || "").trim(); // YYYY-MM-DD
+    const to = (req.query.to || "").trim();     // YYYY-MM-DD
+
+    const filter = {};
+
+    if (action) filter.action_type = action;
+    if (entity) filter.entity_type = entity;
+
+    if (anchored === "anchored") filter.anchored = true;
+    if (anchored === "pending") filter.anchored = false;
+
+    if (batchId) {
+      filter.$or = [
+        { import_batch_id: batchId },
+        { anchor_batch: batchId },
+      ];
+    }
+
+    if (from || to) {
+      filter.timestamp = {};
+      if (from) filter.timestamp.$gte = new Date(from + "T00:00:00.000Z");
+      if (to) filter.timestamp.$lte = new Date(to + "T23:59:59.999Z");
+    }
+
+    if (q) {
+      const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const qOr = [
+        { username: re },
+        { action_type: re },
+        { entity_type: re },
+        { entity_id: re },
+        { field: re },
+        { old_value: re },
+        { new_value: re },
+        { source: re },
+        { remarks: re },
+        { hash: re },
+        { prev_hash: re },
+        { anchor_tx: re },
+        { import_batch_id: re },
+        { anchor_batch: re },
+      ];
+      if (filter.$or) filter.$and = [{ $or: filter.$or }, { $or: qOr }];
+      else filter.$or = qOr;
+      delete filter.$or; // handled by $and when batchId exists
+      if (!filter.$and) filter.$or = qOr;
+    }
+
+    const total = await AuditLog.countDocuments(filter);
+    const totalPages = Math.max(Math.ceil(total / perPage), 1);
+
+    const logs = await AuditLog.find(filter)
+      .sort({ timestamp: -1, _id: -1 })
+      .skip(skip)
+      .limit(perPage)
+      .lean();
+
+    // dropdown lists (simple demo list; replace with your real action/entity list)
+    const actionList = ["LOGIN","LOGOUT","UPDATE_STATUS","IMPORT_DELIVERIES","ROLE_UPDATE"];
+    const entityList = ["User","Delivery","Batch","System"];
+
+    return res.render("auditLog", {
+      logs,
+      page,
+      totalPages,
+      perPage,
+      q,
+      action,
+      entity,
+      batchId,
+      anchored,
+      from,
+      to,
+      actionList,
+      entityList,
+    });
+  } catch (err) {
+    console.error("Error loading auditLog:", err);
+    return res.render("auditLog", {
+      logs: [],
+      page: 1,
+      totalPages: 1,
+      perPage: 20,
+      q: "",
+      action: "",
+      entity: "",
+      batchId: "",
+      anchored: "",
+      from: "",
+      to: "",
+      actionList: [],
+      entityList: [],
+    });
+  }
+});
+
 // -------------------- ROUTER MOUNTING --------------------
 
 // Auth (login, logout, signup actions, etc.)
