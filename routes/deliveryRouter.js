@@ -198,7 +198,7 @@ function pickCardNumber(row) {
 //routes
 router.get('/', async (req, res) => {
   try {
-    const batchId = req.query.batchId;
+    const batchId = req.query.batchId || null;
 
     if (!batchId) {
       return res.render('deliveries', {
@@ -216,10 +216,13 @@ router.get('/', async (req, res) => {
       id: d._id.toString(),
     }));
 
-    res.render('deliveries', { deliveries });
+    return res.render('deliveries', {
+      deliveries,
+      batchId   // ✅ IMPORTANT
+    });
   } catch (err) {
     console.error('Error fetching deliveries:', err);
-    res.status(500).send('Error loading deliveries');
+    return res.status(500).send('Error loading deliveries');
   }
 });
 

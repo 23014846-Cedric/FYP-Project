@@ -51,7 +51,7 @@
       </form>
     </div>
   </div>
-  <% if (batchId) { %>
+  <% if (typeof batchId !== 'undefined' && batchId) { %>
     <div class="alert alert-info">
       Viewing import batch: <code><%= batchId %></code>
     </div>
