@@ -9,6 +9,7 @@
 <body class="p-4">
   <%- include("partials/navbar") %>
 
+
   <%
     function getRowColor(action) {
       if (action === "UPDATE_STATUS") return "table-success"; // green
@@ -45,11 +46,12 @@
       </tr>
     </thead>
 
+
     <tbody>
       <% if (logs && logs.length > 0) { %>
         <% logs.forEach(log => { %>
           <tr class="<%= getRowColor(log.action_type) %>">
-            <!-- Time -->
+
             <td>
               <% if (log.timestamp) { %>
                 <%= new Date(log.timestamp).toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) %>
@@ -58,47 +60,28 @@
               <% } %>
             </td>
 
-            <!-- User -->
-            <td>
-              <strong><%= log.username || log.user_email || 'System' %></strong>
-            </td>
-
-            <!-- Action -->
+            <td><strong><%= log.username || log.user_email || 'System' %></strong></td>
             <td><%= log.action_type || '-' %></td>
-
-            <!-- Entity -->
             <td><%= log.entity_type || '-' %></td>
-
-            <!-- Entity ID -->
             <td><code><%= log.entity_id || '-' %></code></td>
-
-            <!-- Source -->
             <td><%= log.source || 'Web' %></td>
 
-            <!-- Old → New -->
             <td style="max-width: 420px; font-size: 0.85rem;">
               <% if (log.field && (log.old_value || log.new_value)) { %>
                 <div>
                   <strong><code><%= log.field %></code>:</strong>
-                  <code><%= log.old_value !== undefined && log.old_value !== null ? log.old_value : '-' %></code>
+                  <code><%= (log.old_value !== undefined && log.old_value !== null) ? log.old_value : '-' %></code>
                   &nbsp;&rarr;&nbsp;
-                  <code><%= log.new_value !== undefined && log.new_value !== null ? log.new_value : '-' %></code>
+                  <code><%= (log.new_value !== undefined && log.new_value !== null) ? log.new_value : '-' %></code>
                 </div>
               <% } else if (log.old_value || log.new_value) { %>
-                <div>
-                  <strong>Old:</strong>
-                  <code><%= log.old_value !== undefined ? log.old_value : '-' %></code>
-                </div>
-                <div>
-                  <strong>New:</strong>
-                  <code><%= log.new_value !== undefined ? log.new_value : '-' %></code>
-                </div>
+                <div><strong>Old:</strong> <code><%= (log.old_value !== undefined && log.old_value !== null) ? log.old_value : '-' %></code></div>
+                <div><strong>New:</strong> <code><%= (log.new_value !== undefined && log.new_value !== null) ? log.new_value : '-' %></code></div>
               <% } else { %>
                 <span class="text-muted">No value change recorded</span>
               <% } %>
             </td>
 
-            <!-- Remarks -->
             <td><%= log.remarks || '' %></td>
 
             <!-- ✅ Blockchain Status -->
@@ -142,7 +125,51 @@
     </tbody>
   </table>
 
-  <a href="/deliveries" class="btn btn-secondary">Back to Deliveries</a>
+  <!-- PAGINATION CONTROLS -->
+  <nav class="d-flex justify-content-center mt-3" aria-label="Audit pagination">
+    <ul class="pagination pagination-sm">
+
+      <!-- Prev -->
+      <li class="page-item <%= (page <= 1 ? 'disabled' : '') %>">
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.max(1, page - 1) }) %>">Prev</a>
+      </li>
+
+      <!-- Page numbers (compact) -->
+      <%
+        // show up to 7 pages around current
+        const start = Math.max(1, page - 3);
+        const end = Math.min(totalPages, page + 3);
+      %>
+
+      <% if (start > 1) { %>
+        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: 1 }) %>">1</a></li>
+        <% if (start > 2) { %>
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        <% } %>
+      <% } %>
+
+      <% for (let p = start; p <= end; p++) { %>
+        <li class="page-item <%= (p === page ? 'active' : '') %>">
+          <a class="page-link" href="/auditLog?<%= buildQuery({ page: p }) %>"><%= p %></a>
+        </li>
+      <% } %>
+
+      <% if (end < totalPages) { %>
+        <% if (end < totalPages - 1) { %>
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        <% } %>
+        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: totalPages }) %>"><%= totalPages %></a></li>
+      <% } %>
+
+      <!-- Next -->
+      <li class="page-item <%= (page >= totalPages ? 'disabled' : '') %>">
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.min(totalPages, page + 1) }) %>">Next</a>
+      </li>
+
+    </ul>
+  </nav>
+
+  <a href="/deliveries" class="btn btn-secondary mt-3">Back to Deliveries</a>
 
   <footer class="bg-dark text-white py-3 mt-4">
     <div class="container text-center">
@@ -274,3 +301,4 @@
 
 </body>
 </html>
+
