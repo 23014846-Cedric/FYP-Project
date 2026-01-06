@@ -12,6 +12,7 @@ const { maskCard, maskAddress } = require('./utils/mask');
 
 // Models
 const CardDelivery  = require('./models/CardDelivery');
+const ErrorLog = require("./models/ErrorLog");
 
 // Routers
 const contactRouter   = require('./routes/contactRouter');
@@ -68,6 +69,10 @@ app.use(auditApiRouter);
 
 // Mount reveal router
 app.use(revealRouter);
+
+// Deliveries and Exceptions – Admin + Operations
+app.use("/deliveries", authMiddleware, requireRole(["admin","operations"]), deliveryRouter);
+app.use("/exceptions", authMiddleware, requireRole(["admin","operations"]), exceptionRouter);
 
 // Attach decoded user (if any) to res.locals for all views
 function attachUserFromToken(req, res, next) {

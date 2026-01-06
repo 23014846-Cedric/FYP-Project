@@ -2,14 +2,9 @@
 const mongoose = require("mongoose");
 
 const STATUS = [
-  "Pending",
-  "Pulled Out",
-  "Not Found",
-  "Handed to Courier",
-  "Delivered",
-  "Returned to Printer",
-  "Destroyed",
-  "Reprocessing",
+  "Pending","Pulled Out","Not Found","Handed to Courier",
+  "Delivered","Returned to Printer","Destroyed","Reprocessing",
+  "Failed"
 ];
 
 const cardDeliverySchema = new mongoose.Schema(
@@ -21,7 +16,6 @@ const cardDeliverySchema = new mongoose.Schema(
     status: { type: String, enum: STATUS, default: "Pending" },
     updated_at: { type: Date, default: Date.now },
 
-    // ✅ NEW: import tracking
     import_batch_id: { type: String, index: true },
     imported_by: { type: String }, // user id/email/name
     imported_at: { type: Date },

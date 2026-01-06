@@ -146,6 +146,7 @@
 
             <td>
               <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1">
+                <input type="hidden" name="batchId" value="<%= batchId || '' %>">
                 <select name="status" class="form-select form-select-sm">
                   <option value="Pending"             <%= d.status === 'Pending' ? 'selected' : '' %>>Pending</option>
                   <option value="Pulled Out"          <%= d.status === 'Pulled Out' ? 'selected' : '' %>>Pulled Out</option>

@@ -58,7 +58,7 @@
     <!-- Stats Row (Clickable) -->
     <div class="row g-3">
       <div class="col-12 col-sm-6 col-lg-3">
-        <a href="/deliveries" class="text-decoration-none text-dark">
+        <a class="text-decoration-none text-dark">
           <div class="card-box text-center h-100">
             <p class="text-muted mb-2">Total Deliveries</p>
             <p class="stat-number mb-0"><%= stats ? stats.total : 0 %></p>
@@ -78,21 +78,11 @@
       <div class="col-12 col-sm-6 col-lg-3">
         <a href="/deliveries" class="text-decoration-none text-dark">
           <div class="card-box text-center h-100">
-            <p class="text-muted mb-2">In Transit</p>
-            <p class="stat-number text-info mb-0"><%= stats ? stats.inTransit : 0 %></p>
+            <p class="text-muted mb-2">Pending</p>
+            <p class="stat-number text-success mb-0"><%= stats ? stats.pending : 0 %></p>
           </div>
         </a>
       </div>
-
-      <div class="col-12 col-sm-6 col-lg-3">
-        <a href="/exceptions" class="text-decoration-none text-dark">
-          <div class="card-box text-center h-100">
-            <p class="text-muted mb-2">Exceptions</p>
-            <p class="stat-number text-danger mb-0"><%= stats ? stats.exceptions : 0 %></p>
-          </div>
-        </a>
-      </div>
-    </div>
 
     <!-- Charts Row -->
     <div class="row g-3 mt-4">

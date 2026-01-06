@@ -352,32 +352,20 @@ router.post('/clear-session', (req, res) => {
 router.post('/:id/status', async (req, res) => {
   try {
     const deliveryId = req.params.id;
-
-
     const new_status = req.body.status;
+    const batchId = req.body.batchId;
 
     const allowedStatuses = [
-      'Pending',
-      'Pulled Out',
-      'Not Found',
-      'Handed to Courier',
-      'Delivered',
-      'Returned to Printer',
-      'Destroyed',
-      'Reprocessing',
+      'Pending','Pulled Out','Not Found','Handed to Courier',
+      'Delivered','Returned to Printer','Destroyed','Reprocessing','Failed'
     ];
 
-    if (!allowedStatuses.includes(new_status)) {
-      return res.status(400).send('Invalid status');
-    }
+    if (!allowedStatuses.includes(new_status)) return res.status(400).send('Invalid status');
 
     const existing = await CardDelivery.findById(deliveryId).lean();
-    const oldStatus = existing ? existing.status : null;
+    const oldStatus = existing?.status ?? null;
 
-    await CardDelivery.findByIdAndUpdate(deliveryId, {
-      status: new_status,
-      updated_at: new Date(),
-    });
+    await CardDelivery.findByIdAndUpdate(deliveryId, { status: new_status, updated_at: new Date() });
 
     await addAuditLog(req, {
       action_type: 'UPDATE_STATUS',
@@ -387,13 +375,13 @@ router.post('/:id/status', async (req, res) => {
       old_value: oldStatus,
       new_value: new_status,
       source: 'Deliveries Page',
-      remarks: `Status updated by ${req.user?.name || 'Unknown'}`,
     });
 
-    res.redirect('/deliveries');
+    const redirectBatch = batchId || existing?.import_batch_id;
+    return res.redirect(redirectBatch ? `/deliveries?batchId=${encodeURIComponent(redirectBatch)}` : '/deliveries');
   } catch (err) {
-    console.error('Error updating delivery status:', err);
-    res.status(500).send('Error updating delivery status');
+    console.error(err);
+    return res.status(500).send('Error updating delivery status');
   }
 });
 
