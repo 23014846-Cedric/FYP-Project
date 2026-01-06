@@ -2,7 +2,6 @@
 <html>
 <head>
   <title>System Activity Log – Audit Trail</title>
-  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 
@@ -10,32 +9,50 @@
   <%- include("partials/navbar") %>
 
   <%
+    // Safe defaults (prevents crashes if controller forgets to pass these)
+    const safePage = (typeof page !== "undefined" && Number(page) > 0) ? Number(page) : 1;
+    const safeTotalPages = (typeof totalPages !== "undefined" && Number(totalPages) > 0) ? Number(totalPages) : 1;
+
     function getRowColor(action) {
-      if (action === "UPDATE_STATUS") return "table-success"; // green
-      if (action === "LOGIN" || action === "LOGOUT") return "table-warning"; // yellow
-      if (action === "ROLE_UPDATE" || action === "IMPORT_DELIVERIES") return "table-danger"; // red
+      if (action === "UPDATE_STATUS") return "table-success";
+      if (action === "LOGIN" || action === "LOGOUT") return "table-warning";
+      if (action === "ROLE_UPDATE" || action === "IMPORT_DELIVERIES") return "table-danger";
       return "";
     }
-  %>
 
-  <%
     // Build query string for pagination while preserving existing filters
     function buildQuery(overrides = {}) {
       const params = new URLSearchParams();
 
-      if (typeof page !== "undefined" && page) params.set("page", String(page));
+      // preserve known filters if controller passed them
       if (typeof q !== "undefined" && q) params.set("q", String(q));
       if (typeof action !== "undefined" && action) params.set("action", String(action));
       if (typeof entity !== "undefined" && entity) params.set("entity", String(entity));
       if (typeof batchId !== "undefined" && batchId) params.set("batchId", String(batchId));
       if (typeof anchored !== "undefined" && anchored) params.set("anchored", String(anchored));
 
+      // always keep current page unless overridden
+      params.set("page", String(safePage));
+
+      // apply overrides
       for (const [k, v] of Object.entries(overrides)) {
         if (v === null || v === undefined || v === "") params.delete(k);
         else params.set(k, String(v));
       }
 
       return params.toString();
+    }
+
+    // Try to extract batchId even if you didn't store it as a field
+    function inferBatchId(log) {
+      if (!log) return "";
+      if (log.import_batch_id) return String(log.import_batch_id);
+      if (log.batchId) return String(log.batchId);
+      if (log.remarks) {
+        const m = String(log.remarks).match(/Batch:\s*([a-f0-9-]+)/i);
+        if (m && m[1]) return m[1];
+      }
+      return "";
     }
   %>
 
@@ -57,13 +74,9 @@
         <th>Entity</th>
         <th>Entity ID</th>
         <th>Source</th>
-        <th>Old → New (What changed)</th>
+        <th>Old → New</th>
         <th>Remarks</th>
-
-        <!-- ✅ NEW -->
         <th>Details</th>
-
-        <!-- ✅ Existing -->
         <th>Blockchain</th>
         <th>Tx Hash</th>
       </tr>
@@ -72,69 +85,61 @@
     <tbody>
       <% if (logs && logs.length > 0) { %>
         <% logs.forEach(log => { %>
-
-          <% 
-            const isImport = (log.action_type === "IMPORT_DELIVERIES" && log.import_batch_id);
-            const collapseId = isImport ? ("batch-" + log.import_batch_id) : "";
+          <%
+            const inferredBatch = inferBatchId(log);
+            const isImport = (log.action_type === "IMPORT_DELIVERIES" && inferredBatch);
+            const collapseId = isImport ? ("imp_" + inferredBatch) : null;
           %>
 
+          <!-- MAIN ROW -->
           <tr class="<%= getRowColor(log.action_type) %>">
-
             <td>
-              <% if (log.timestamp) { %>
-                <%= new Date(log.timestamp).toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) %>
-              <% } else { %>
-                -
-              <% } %>
+              <%= log.timestamp ? new Date(log.timestamp).toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) : "-" %>
             </td>
 
-            <td><strong><%= log.username || log.user_email || 'System' %></strong></td>
-            <td><%= log.action_type || '-' %></td>
-            <td><%= log.entity_type || '-' %></td>
-            <td><code><%= log.entity_id || '-' %></code></td>
-            <td><%= log.source || 'Web' %></td>
+            <td><strong><%= log.username || log.user_email || "System" %></strong></td>
+            <td><%= log.action_type || "-" %></td>
+            <td><%= log.entity_type || "-" %></td>
+            <td><code><%= log.entity_id || "-" %></code></td>
+            <td><%= log.source || "Web" %></td>
 
             <td style="max-width: 420px; font-size: 0.85rem;">
               <% if (log.field && (log.old_value || log.new_value)) { %>
                 <div>
                   <strong><code><%= log.field %></code>:</strong>
-                  <code><%= (log.old_value !== undefined && log.old_value !== null) ? log.old_value : '-' %></code>
+                  <code><%= (log.old_value !== undefined && log.old_value !== null) ? log.old_value : "-" %></code>
                   &nbsp;&rarr;&nbsp;
-                  <code><%= (log.new_value !== undefined && log.new_value !== null) ? log.new_value : '-' %></code>
+                  <code><%= (log.new_value !== undefined && log.new_value !== null) ? log.new_value : "-" %></code>
                 </div>
               <% } else if (log.old_value || log.new_value) { %>
-                <div><strong>Old:</strong> <code><%= (log.old_value !== undefined && log.old_value !== null) ? log.old_value : '-' %></code></div>
-                <div><strong>New:</strong> <code><%= (log.new_value !== undefined && log.new_value !== null) ? log.new_value : '-' %></code></div>
+                <div><strong>Old:</strong> <code><%= (log.old_value ?? "-") %></code></div>
+                <div><strong>New:</strong> <code><%= (log.new_value ?? "-") %></code></div>
               <% } else { %>
                 <span class="text-muted">No value change recorded</span>
               <% } %>
             </td>
 
-            <td><%= log.remarks || '' %></td>
+            <td><%= log.remarks || "" %></td>
 
-            <!-- ✅ Details column (collapsible for imports) -->
-            <td class="text-center" style="min-width: 120px;">
+            <!-- Details -->
+            <td class="text-center" style="min-width: 180px;">
               <% if (isImport) { %>
                 <button
-                  class="btn btn-sm btn-outline-primary"
+                  class="btn btn-sm btn-outline-primary btn-toggle-import"
                   type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#<%= collapseId %>"
-                  aria-expanded="false"
-                  onclick="loadBatch('<%= log.import_batch_id %>')"
+                  data-target="<%= collapseId %>"
+                  data-batch="<%= inferredBatch %>"
                 >
                   View
                 </button>
-                <div class="small text-muted mt-1">
-                  Batch: <code><%= log.import_batch_id %></code>
-                </div>
+                <div class="small text-muted mt-1">Batch: <code><%= inferredBatch %></code></div>
               <% } else { %>
                 <span class="text-muted">-</span>
               <% } %>
             </td>
 
-            <!-- ✅ Blockchain Status -->
-            <td style="min-width: 170px;">
+            <!-- Blockchain -->
+            <td style="min-width: 200px;">
               <% if (log.txHash) { %>
                 <span class="badge bg-success">Anchored ✅</span>
               <% } else if (log.logHash) { %>
@@ -145,15 +150,12 @@
                   data-action="<%= log.action_type || 'UNKNOWN' %>">
                   Anchor to Ganache
                 </button>
-                <div class="small text-muted mt-1">
-                  Hash: <code><%= log.logHash %></code>
-                </div>
+                <div class="small text-muted mt-1">Hash: <code><%= log.logHash %></code></div>
               <% } else { %>
                 <span class="text-muted">No hash</span>
               <% } %>
             </td>
 
-            <!-- ✅ Tx Hash -->
             <td style="max-width: 260px; font-size: 0.78rem;">
               <% if (log.txHash) { %>
                 <code><%= log.txHash %></code>
@@ -161,10 +163,9 @@
                 <span class="text-muted">-</span>
               <% } %>
             </td>
-
           </tr>
 
-          <!-- ✅ Collapsible detail row (only for IMPORT_DELIVERIES) -->
+          <!-- COLLAPSE ROW (IMPORT ONLY) -->
           <% if (isImport) { %>
             <tr>
               <td colspan="11" class="p-0">
@@ -174,12 +175,12 @@
                       <div>
                         <strong>Imported Deliveries Preview</strong>
                         <div class="small text-muted">
-                          Batch: <code><%= log.import_batch_id %></code> (loads first 50 records)
+                          Batch: <code><%= inferredBatch %></code> (loads first 50)
                         </div>
                       </div>
                     </div>
 
-                    <div id="batch-body-<%= log.import_batch_id %>" class="mt-3">
+                    <div id="batch-body-<%= inferredBatch %>" class="mt-3">
                       <div class="text-muted small">Click “View” to load records…</div>
                     </div>
                   </div>
@@ -191,49 +192,42 @@
         <% }) %>
       <% } else { %>
         <tr>
-          <td colspan="11" class="text-center text-muted">
-            No audit log entries found.
-          </td>
+          <td colspan="11" class="text-center text-muted">No audit log entries found.</td>
         </tr>
       <% } %>
     </tbody>
   </table>
 
-  <!-- PAGINATION CONTROLS -->
+  <!-- Pagination -->
   <nav class="d-flex justify-content-center mt-3" aria-label="Audit pagination">
     <ul class="pagination pagination-sm">
-
-      <li class="page-item <%= (page <= 1 ? 'disabled' : '') %>">
-        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.max(1, page - 1) }) %>">Prev</a>
+      <li class="page-item <%= (safePage <= 1 ? 'disabled' : '') %>">
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.max(1, safePage - 1) }) %>">Prev</a>
       </li>
 
       <%
-        const start = Math.max(1, page - 3);
-        const end = Math.min(totalPages, page + 3);
+        const start = Math.max(1, safePage - 3);
+        const end = Math.min(safeTotalPages, safePage + 3);
       %>
 
       <% if (start > 1) { %>
         <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: 1 }) %>">1</a></li>
-        <% if (start > 2) { %>
-          <li class="page-item disabled"><span class="page-link">…</span></li>
-        <% } %>
+        <% if (start > 2) { %><li class="page-item disabled"><span class="page-link">…</span></li><% } %>
       <% } %>
 
       <% for (let p = start; p <= end; p++) { %>
-        <li class="page-item <%= (p === page ? 'active' : '') %>">
+        <li class="page-item <%= (p === safePage ? 'active' : '') %>">
           <a class="page-link" href="/auditLog?<%= buildQuery({ page: p }) %>"><%= p %></a>
         </li>
       <% } %>
 
-      <% if (end < totalPages) { %>
-        <% if (end < totalPages - 1) { %>
-          <li class="page-item disabled"><span class="page-link">…</span></li>
-        <% } %>
-        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: totalPages }) %>"><%= totalPages %></a></li>
+      <% if (end < safeTotalPages) { %>
+        <% if (end < safeTotalPages - 1) { %><li class="page-item disabled"><span class="page-link">…</span></li><% } %>
+        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: safeTotalPages }) %>"><%= safeTotalPages %></a></li>
       <% } %>
 
-      <li class="page-item <%= (page >= totalPages ? 'disabled' : '') %>">
-        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.min(totalPages, page + 1) }) %>">Next</a>
+      <li class="page-item <%= (safePage >= safeTotalPages ? 'disabled' : '') %>">
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.min(safeTotalPages, safePage + 1) }) %>">Next</a>
       </li>
     </ul>
   </nav>
@@ -246,17 +240,141 @@
     </div>
   </footer>
 
-  <!-- Bootstrap JS (required for collapse) -->
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-  <!-- XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
-  <!-- ✅ Ethers (v5 works best with Ganache + MetaMask) -->
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
   <script>
-    // ✅ Paste your deployed Ganache contract address here
+    // =========================
+    // 1) IMPORT COLLAPSE TOGGLE
+    // =========================
+    const loadedBatches = new Set();
+
+    async function loadBatch(batchId) {
+      if (!batchId) return;
+      if (loadedBatches.has(batchId)) return;
+      loadedBatches.add(batchId);
+
+      const container = document.getElementById("batch-body-" + batchId);
+      if (!container) return;
+
+      container.innerHTML = `<div class="text-muted small">Loading...</div>`;
+
+      try {
+        const res = await fetch(`/api/import-batch/${encodeURIComponent(batchId)}?limit=50`);
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) {
+          container.innerHTML = `<div class="text-danger small">Failed to load imported records.</div>`;
+          return;
+        }
+
+        const deliveries = data.deliveries || [];
+        if (deliveries.length === 0) {
+          container.innerHTML = `<div class="text-muted small">No records found for this batch.</div>`;
+          return;
+        }
+
+        const rows = deliveries.map(d => `
+          <tr>
+            <td><code>${d.card_number || "-"}</code></td>
+            <td>${d.recipient_name || "-"}</td>
+            <td>${d.address || "-"}</td>
+            <td>${d.courier || "-"}</td>
+            <td>${d.status || "-"}</td>
+          </tr>
+        `).join("");
+
+        container.innerHTML = `
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle mb-0">
+              <thead class="table-secondary">
+                <tr>
+                  <th>Card/Ref</th>
+                  <th>Recipient</th>
+                  <th>Address</th>
+                  <th>Courier</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+          <div class="small text-muted mt-2">Showing ${deliveries.length} records (preview limit).</div>
+        `;
+      } catch (e) {
+        container.innerHTML = `<div class="text-danger small">Error: ${e.message || e}</div>`;
+      }
+    }
+
+    // Manual toggle so clicking again CLOSES it
+    document.querySelectorAll(".btn-toggle-import").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const targetId = btn.dataset.target;   // e.g. "imp_<uuid>"
+        const batchId = btn.dataset.batch;
+
+        const el = document.getElementById(targetId);
+        if (!el) return;
+
+        const isOpen = el.classList.contains("show");
+        const instance = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+
+        // load once when opening
+        if (!isOpen) {
+          await loadBatch(batchId);
+          btn.textContent = "Hide";
+        } else {
+          btn.textContent = "View";
+        }
+
+        instance.toggle();
+      });
+    });
+
+    // If collapse is closed via other means, reset button text properly
+    document.querySelectorAll(".collapse").forEach(col => {
+      col.addEventListener("hidden.bs.collapse", () => {
+        const id = col.getAttribute("id");
+        const btn = document.querySelector(`.btn-toggle-import[data-target="${id}"]`);
+        if (btn) btn.textContent = "View";
+      });
+      col.addEventListener("shown.bs.collapse", () => {
+        const id = col.getAttribute("id");
+        const btn = document.querySelector(`.btn-toggle-import[data-target="${id}"]`);
+        if (btn) btn.textContent = "Hide";
+      });
+    });
+
+    // =========================
+    // 2) EXCEL EXPORT
+    // =========================
+    document.getElementById("exportExcel").addEventListener("click", () => {
+      const table = document.querySelector("table");
+      const ws = XLSX.utils.table_to_sheet(table);
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+
+      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 });
+        const cell = ws[cellRef];
+        if (cell?.v) {
+          const dateObj = new Date(cell.v);
+          if (!isNaN(dateObj.getTime())) {
+            cell.v = dateObj;
+            cell.t = "d";
+            cell.z = "yyyy-mm-dd hh:mm:ss";
+          }
+        }
+      }
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Audit Logs");
+      XLSX.writeFile(wb, "audit_logs.xlsx");
+    });
+
+    // =========================
+    // 3) OPTIONAL: GANACHE ANCHOR
+    // =========================
     const CONTRACT_ADDRESS = "0xF9cC401278b0Cd6a1Ebe54282B0015b0cA0aF7D1";
 
     const CONTRACT_ABI = [
@@ -289,8 +407,8 @@
         return;
       }
 
-      if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS.includes("PASTE_")) {
-        alert("You must paste your CONTRACT_ADDRESS into auditLog.ejs first.");
+      if (!CONTRACT_ADDRESS) {
+        alert("Missing CONTRACT_ADDRESS in auditLog.ejs");
         return;
       }
 
@@ -307,7 +425,6 @@
 
       const tx = await contract.logAudit(logHash, actionType, { gasLimit: 200000 });
       const receipt = await tx.wait();
-
       const txHash = receipt.transactionHash;
 
       const res = await fetch(`/api/audit/${auditLogId}/tx`, {
@@ -337,90 +454,6 @@
         }
       });
     });
-
-    // ✅ Collapsible import loader
-    const loadedBatches = new Set();
-
-    async function loadBatch(batchId) {
-      if (!batchId) return;
-      if (loadedBatches.has(batchId)) return;
-      loadedBatches.add(batchId);
-
-      const container = document.getElementById("batch-body-" + batchId);
-      if (!container) return;
-
-      container.innerHTML = `<div class="text-muted small">Loading...</div>`;
-
-      try {
-        const res = await fetch(`/api/import-batch/${batchId}?limit=50`);
-        const data = await res.json();
-
-        if (!res.ok || !data.ok) {
-          container.innerHTML = `<div class="text-danger small">Failed to load imported records.</div>`;
-          return;
-        }
-
-        if (!data.deliveries || data.deliveries.length === 0) {
-          container.innerHTML = `<div class="text-muted small">No records found for this batch.</div>`;
-          return;
-        }
-
-        const rows = data.deliveries.map(d => `
-          <tr>
-            <td><code>${d.card_number || "-"}</code></td>
-            <td>${d.recipient_name || "-"}</td>
-            <td>${d.status || "-"}</td>
-            <td class="text-muted">${d.imported_at ? new Date(d.imported_at).toLocaleString("en-SG") : "-"}</td>
-          </tr>
-        `).join("");
-
-        container.innerHTML = `
-          <div class="table-responsive">
-            <table class="table table-sm table-bordered align-middle mb-0">
-              <thead class="table-secondary">
-                <tr>
-                  <th>Card #</th>
-                  <th>Recipient</th>
-                  <th>Status</th>
-                  <th>Imported At</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>
-          <div class="small text-muted mt-2">
-            Showing ${data.deliveries.length} records (preview limit).
-          </div>
-        `;
-      } catch (e) {
-        container.innerHTML = `<div class="text-danger small">Error: ${e.message || e}</div>`;
-      }
-    }
-
-    // Excel export (your existing logic)
-    document.getElementById("exportExcel").addEventListener("click", () => {
-      const table = document.querySelector("table");
-      const ws = XLSX.utils.table_to_sheet(table);
-      const range = XLSX.utils.decode_range(ws["!ref"]);
-
-      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: 0 });
-        const cell = ws[cellRef];
-        if (cell?.v) {
-          const dateObj = new Date(cell.v);
-          if (!isNaN(dateObj.getTime())) {
-            cell.v = dateObj;
-            cell.t = "d";
-            cell.z = "yyyy-mm-dd hh:mm:ss";
-          }
-        }
-      }
-
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Audit Logs");
-      XLSX.writeFile(wb, "audit_logs.xlsx");
-    });
   </script>
-
 </body>
 </html>

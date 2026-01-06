@@ -268,23 +268,19 @@ router.post('/', deliveryValidationRules, async (req, res) => {
 });
 
 
-router.post('/import', upload.single('excel_file'), async (req, res) => {
+router.post("/import", upload.single("excel_file"), async (req, res) => {
   try {
     if (!req.file) {
-      console.error('No file uploaded');
-      return res.redirect('/deliveries');
+      return res.redirect("/deliveries");
     }
 
-    //unique batch ID for current import session
     const batchId = crypto.randomUUID();
 
     const workbook = xlsx.readFile(req.file.path);
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    //parse your file format
     const rows = parseProgressiveReportRows(sheet);
 
-    console.log('[Import] Parsed rows:', rows.length);
+    console.log("[Import] Parsed rows:", rows.length);
 
     const docs = [];
     let invalidCount = 0;
@@ -296,12 +292,10 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
       }
 
       const card_number = pickCardNumber(row);
-      const recipient_name = String(row['NAME'] ?? '').trim();
+      const recipient_name = String(row["NAME"] ?? "").trim();
       const address = buildAddress(row);
-
-      const courier = String(row['PORT'] ?? '-').trim() || '-';
-
-      const status = mapFileStatusToAppStatus(row['STATUS']);
+      const courier = String(row["PORT"] ?? "-").trim() || "-";
+      const status = mapFileStatusToAppStatus(row["STATUS"]);
 
       docs.push({
         card_number,
@@ -311,41 +305,43 @@ router.post('/import', upload.single('excel_file'), async (req, res) => {
         status,
         updated_at: new Date(),
 
-        // ✅ NEW: session/batch tracking
         import_batch_id: batchId,
-        imported_by: req.user?.id || req.user?.name || 'system',
+        imported_by: req.user?.id || req.user?.email || req.user?.name || "system",
         imported_at: new Date(),
       });
     }
 
     if (docs.length === 0) {
-      console.warn('[Import] No valid rows found in file');
-      return res.redirect('/deliveries');
+      console.warn("[Import] No valid rows found in file");
+      // ✅ only ONE response
+      return res.redirect("/deliveries");
     }
 
     const result = await CardDelivery.insertMany(docs);
-    console.log(
-      `[Import] Successfully inserted ${result.length} deliveries. Invalid rows: ${invalidCount}`
-    );
+    console.log(`[Import] Successfully inserted ${result.length} deliveries. Invalid rows: ${invalidCount}`);
 
-    res.redirect(`/deliveries?batchId=${batchId}`);
-
+    // ✅ log audit with import_batch_id
     await addAuditLog(req, {
-      action_type: 'IMPORT_DELIVERIES',
-      entity_type: 'CardDelivery',
-      entity_id: 'BULK',
+      action_type: "IMPORT_DELIVERIES",
+      entity_type: "CardDelivery",
+      entity_id: "BULK",
+      source: "Deliveries Import",
+      remarks: `Imported ${result.length} deliveries from Excel. Skipped ${invalidCount} invalid rows.`,
       import_batch_id: batchId,
-      source: 'Deliveries Import',
-      remarks: `Imported ${result.length} deliveries from Excel. Skipped ${invalidCount} invalid rows. Batch: ${batchId}`,
     });
 
-    res.redirect('/deliveries');
+    // ✅ Redirect to the batch you just imported (ONE response)
+    return res.redirect(`/deliveries?batchId=${encodeURIComponent(batchId)}`);
+
   } catch (err) {
-    console.error('Error importing deliveries:', err);
-    res.status(500).send('Error importing deliveries');
+    console.error("Error importing deliveries:", err);
+
+    // ✅ avoid "headers already sent" crash
+    if (res.headersSent) return;
+
+    return res.status(500).send("Error importing deliveries");
   }
 });
-
 
 router.post('/clear-session', (req, res) => {
   res.clearCookie('last_import_batch');

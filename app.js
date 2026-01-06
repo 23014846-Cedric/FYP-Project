@@ -24,6 +24,7 @@ const adminRouter = require("./routes/adminRouter");
 const printerRouter = require("./routes/printerRouter");
 const revealRouter = require("./routes/revealRouter");
 const auditApiRouter = require("./routes/auditApiRouter");
+const importBatchApiRouter = require("./routes/importBatchApiRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -88,6 +89,8 @@ function attachUserFromToken(req, res, next) {
 }
 
 app.use(attachUserFromToken);
+
+app.use(importBatchApiRouter);
 
 // Simple admin-only middleware
 function adminMiddleware(req, res, next) {

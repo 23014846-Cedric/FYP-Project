@@ -1,16 +1,15 @@
 // models/CardDelivery.js
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
-// High-level lifecycle of a card delivery
 const STATUS = [
-  'Pending',             // created, not yet handed to courier
-  'Pulled Out',          // removed from batch before courier
-  'Not Found',           // address / recipient issue
-  'Handed to Courier',   // with 2GO / LBC
-  'Delivered',           // successful delivery
-  'Returned to Printer', // sent back to Idemia
-  'Destroyed',           // destroyed by Idemia
-  'Reprocessing'         // reprinted / preparing redelivery
+  "Pending",
+  "Pulled Out",
+  "Not Found",
+  "Handed to Courier",
+  "Delivered",
+  "Returned to Printer",
+  "Destroyed",
+  "Reprocessing",
 ];
 
 const cardDeliverySchema = new mongoose.Schema(
@@ -19,16 +18,16 @@ const cardDeliverySchema = new mongoose.Schema(
     recipient_name: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
     courier: { type: String, trim: true, default: "-" },
-    status: { type: String, enum: STATUS, default: 'Pending' },
+    status: { type: String, enum: STATUS, default: "Pending" },
     updated_at: { type: Date, default: Date.now },
 
-    //import tracking
-    import_batch_id: { type: String, index: true },     
-    imported_by: { type: String, trim: true },          
-    imported_at: { type: Date, default: Date.now },     
+    // ✅ NEW: import tracking
+    import_batch_id: { type: String, index: true },
+    imported_by: { type: String }, // user id/email/name
+    imported_at: { type: Date },
   },
   {
-    timestamps: { createdAt: "created_at", updatedAt: false }
+    timestamps: { createdAt: "created_at", updatedAt: false },
   }
 );
 
