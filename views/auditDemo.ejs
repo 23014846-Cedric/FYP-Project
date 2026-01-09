@@ -28,34 +28,41 @@
     const CONTRACT_ADDRESS = "0xF9cC401278b0Cd6a1Ebe54282B0015b0cA0aF7D1";
 
     const CONTRACT_ABI = [
-    {
+      {
         "anonymous": false,
         "inputs": [
-        { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
-        { "indexed": true, "internalType": "bytes32", "name": "logHash", "type": "bytes32" },
-        { "indexed": false, "internalType": "string", "name": "actionType", "type": "string" },
-        { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+          { "indexed": true, "internalType": "address", "name": "user", "type": "address" },
+          { "indexed": true, "internalType": "bytes32", "name": "logHash", "type": "bytes32" },
+          { "indexed": false, "internalType": "string", "name": "actionType", "type": "string" },
+          { "indexed": false, "internalType": "uint256", "name": "timestamp", "type": "uint256" }
         ],
         "name": "AuditLogged",
         "type": "event"
-    },
-    {
+      },
+      {
         "inputs": [
-        { "internalType": "bytes32", "name": "logHash", "type": "bytes32" },
-        { "internalType": "string", "name": "actionType", "type": "string" }
+          { "internalType": "bytes32", "name": "logHash", "type": "bytes32" },
+          { "internalType": "string", "name": "actionType", "type": "string" }
         ],
         "name": "logAudit",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
-    }
+      }
     ];
-
 
     const statusEl = document.getElementById("status");
     const btn = document.getElementById("btn-demo");
-
     const setStatus = (m) => { statusEl.textContent = m; console.log(m); };
+
+    function toBytes32Hex(h) {
+      const raw = String(h || "").trim().toLowerCase();
+      const hex = raw.startsWith("0x") ? raw : ("0x" + raw);
+      if (!/^0x[0-9a-f]{64}$/.test(hex)) {
+        throw new Error("Invalid bytes32 hash: " + hex);
+      }
+      return hex;
+    }
 
     btn.addEventListener("click", async () => {
       try {
@@ -71,8 +78,11 @@
         const data = await res.json();
         if (!res.ok) return setStatus("Backend error: " + (data.error || "Unknown"));
 
-        const { auditLogId, logHash, actionType } = data;
-        setStatus("2) Got logHash: " + logHash + " → opening MetaMask...");
+        // ✅ API returns "hash" (not "logHash")
+        const { auditLogId, hash, actionType } = data;
+
+        const bytes32Hash = toBytes32Hex(hash);
+        setStatus("2) Got hash: " + bytes32Hash + " → opening MetaMask...");
 
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
@@ -81,20 +91,25 @@
         const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
 
         setStatus("3) Sending blockchain tx...");
-        const tx = await contract.logAudit(logHash, actionType);
+        const tx = await contract.logAudit(bytes32Hash, actionType);
         setStatus("Tx submitted: " + tx.hash + " (waiting confirm)");
 
         const receipt = await tx.wait();
         const txHash = receipt.transactionHash;
 
         setStatus("4) Confirmed: " + txHash + " → saving txHash to DB...");
-        await fetch("/api/audit/" + auditLogId + "/tx", {
+        const saveRes = await fetch("/api/audit/" + auditLogId + "/tx", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ txHash })
         });
 
-        setStatus("✅ Done. txHash saved in MongoDB.");
+        if (!saveRes.ok) {
+          const t = await saveRes.text();
+          return setStatus("Saved on-chain but failed to update DB: " + t);
+        }
+
+        setStatus("✅ Done. anchor_tx saved in MongoDB.");
       } catch (e) {
         setStatus("Error: " + (e.message || e));
       }
