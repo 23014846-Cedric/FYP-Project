@@ -31,6 +31,7 @@ const importBatchApiRouter = require("./routes/importBatchApiRouter");
 const authMiddleware = require('./middleware/authMiddleware');
 const requireRole = require('./middleware/requireRole');
 const revealMiddleware = require("./middleware/revealMiddleware");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -392,6 +393,14 @@ app.use(
   requireRole('admin'),
   auditRouter
 );
+
+// -------------------- ERROR HANDLING (LAST) --------------------
+app.use(notFound);
+app.use(errorHandler);
+app.get("/test-error", (req, res) => {
+  throw new Error("TEST: centralized error middleware works");
+});
+
 
 // -------------------- DATABASE & SERVER --------------------
 

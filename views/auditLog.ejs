@@ -133,7 +133,8 @@
   <table class="table table-bordered table-striped table-sm align-middle">
     <thead class="table-dark">
       <tr>
-        <th>Time</th>
+        <th>Action Time (SG)</th>
+        <th>Blockchain Time (SG)</th>
         <th>User</th>
         <th>Action</th>
         <th>Entity</th>
@@ -158,6 +159,11 @@
 
           <!-- MAIN ROW -->
           <tr class="<%= getRowColor(log.action_type) %>">
+            <td>
+              <%= new Date(log.action_timestamp || log.timestamp)
+                .toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) %>
+            </td>
+
             <td>
               <%= log.timestamp ? new Date(log.timestamp).toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) : "-" %>
             </td>
