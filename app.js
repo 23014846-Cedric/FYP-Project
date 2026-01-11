@@ -13,6 +13,7 @@ const { maskCard, maskAddress } = require('./utils/mask');
 // Models
 const CardDelivery  = require('./models/CardDelivery');
 const ErrorLog = require("./models/ErrorLog");
+const User = require("./models/User");
 
 // Routers
 const contactRouter   = require('./routes/contactRouter');
@@ -297,6 +298,79 @@ app.get("/auditLog", authMiddleware, async (req, res) => {
       .limit(perPage)
       .lean();
 
+    // =======================
+    // AUDIT PAGE STAT CARDS
+    // =======================
+    const [totalUsers, facets] = await Promise.all([
+      User.countDocuments({}),
+      AuditLog.aggregate([
+        { $match: filter },
+        {
+          $facet: {
+            roleCounts: [
+              {
+                $addFields: {
+                  userObjId: {
+                    $convert: {
+                      input: "$user_id",
+                      to: "objectId",
+                      onError: null,
+                      onNull: null,
+                    },
+                  },
+                },
+              },
+              {
+                $lookup: {
+                  from: "users",
+                  localField: "userObjId",
+                  foreignField: "_id",
+                  as: "u",
+                },
+              },
+              { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+              { $group: { _id: "$u.role", count: { $sum: 1 } } },
+            ],
+            actionCounts: [
+              { $group: { _id: "$action_type", count: { $sum: 1 } } }
+            ],
+            anchorCounts: [
+              { $group: { _id: "$anchored", count: { $sum: 1 } } }
+            ],
+          },
+        },
+      ]),
+    ]);
+
+    const facet = facets?.[0] || { roleCounts: [], actionCounts: [], anchorCounts: [] };
+
+    const roleMap = {};
+    facet.roleCounts.forEach(r => { if (r?._id) roleMap[r._id] = r.count; });
+
+    const actionMap = {};
+    facet.actionCounts.forEach(a => { if (a?._id) actionMap[a._id] = a.count; });
+
+    let anchoredCount = 0;
+    let pendingCount = 0;
+    facet.anchorCounts.forEach(a => {
+      if (a._id === true) anchoredCount = a.count;
+      if (a._id === false) pendingCount = a.count;
+    });
+
+    const stats = {
+      totalUsers,
+      adminActions: roleMap.admin || 0,
+      operationsActions: roleMap.operations || 0,
+      courierActions: roleMap.courier || 0,
+      printerActions: roleMap.printer || 0,
+      blockchainAnchored: anchoredCount,
+      blockchainPending: pendingCount,
+      updateStatus: actionMap.UPDATE_STATUS || 0,
+      importDeliveries: actionMap.IMPORT_DELIVERIES || 0,
+      roleUpdates: actionMap.ROLE_UPDATE || 0,
+    };
+
+
     // dropdown lists (simple demo list; replace with your real action/entity list)
     const actionList = ["LOGIN","LOGOUT","UPDATE_STATUS","IMPORT_DELIVERIES","ROLE_UPDATE"];
     const entityList = ["User","Delivery","Batch","System"];
@@ -315,6 +389,7 @@ app.get("/auditLog", authMiddleware, async (req, res) => {
       to,
       actionList,
       entityList,
+      stats,
     });
   } catch (err) {
     console.error("Error loading auditLog:", err);
@@ -332,6 +407,18 @@ app.get("/auditLog", authMiddleware, async (req, res) => {
       to: "",
       actionList: [],
       entityList: [],
+      stats: {
+        totalUsers: 0,
+        adminActions: 0,
+        operationsActions: 0,
+        courierActions: 0,
+        printerActions: 0,
+        blockchainAnchored: 0,
+        blockchainPending: 0,
+        updateStatus: 0,
+        importDeliveries: 0,
+        roleUpdates: 0,
+      },
     });
   }
 });

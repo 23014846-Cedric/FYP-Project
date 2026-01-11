@@ -128,6 +128,116 @@
       </div>
     </div>
   </form>
+
+  <!-- ================= AUDIT SUMMARY CARDS ================= -->
+  <%
+    const s = stats || {};
+    const num = (v) => (typeof v === "number" ? v : 0);
+  %>
+
+  <div class="row g-3 mb-3">
+    <!-- Total Users -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-primary">
+        <div class="card-body">
+          <div class="fw-semibold">Total Users</div>
+          <div class="display-6 fw-bold"><%= num(s.totalUsers) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Actions -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-info">
+        <div class="card-body">
+          <div class="fw-semibold">Admin Actions</div>
+          <div class="display-6 fw-bold"><%= num(s.adminActions) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operations Actions -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-success">
+        <div class="card-body">
+          <div class="fw-semibold">Operations Actions</div>
+          <div class="display-6 fw-bold"><%= num(s.operationsActions) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Courier Actions -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-warning">
+        <div class="card-body">
+          <div class="fw-semibold">Courier Actions</div>
+          <div class="display-6 fw-bold"><%= num(s.courierActions) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blockchain Anchored -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-success">
+        <div class="card-body">
+          <div class="fw-semibold">Blockchain Anchored</div>
+          <div class="display-6 fw-bold"><%= num(s.blockchainAnchored) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blockchain Pending -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-warning">
+        <div class="card-body">
+          <div class="fw-semibold">Blockchain Pending</div>
+          <div class="display-6 fw-bold"><%= num(s.blockchainPending) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update Status -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-primary">
+        <div class="card-body">
+          <div class="fw-semibold">Update Status</div>
+          <div class="display-6 fw-bold"><%= num(s.updateStatus) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Deliveries -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-danger">
+        <div class="card-body">
+          <div class="fw-semibold">Import Deliveries</div>
+          <div class="display-6 fw-bold"><%= num(s.importDeliveries) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Role Updates -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-dark">
+        <div class="card-body">
+          <div class="fw-semibold">Role Updates</div>
+          <div class="display-6 fw-bold"><%= num(s.roleUpdates) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+
   <button id="exportExcel" class="btn btn-success mb-3">Export to Excel</button>
 
   <table class="table table-bordered table-striped table-sm align-middle">
