@@ -60,74 +60,6 @@
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>System Activity Log</h1>
   </div>
-  <form class="card border-0 shadow-sm mb-3" method="GET" action="/auditLog">
-    <div class="card-body">
-      <div class="row g-2 align-items-end">
-        <div class="col-12 col-lg-4">
-          <label class="form-label small mb-1">Search</label>
-          <input class="form-control" name="q" value="<%= q || '' %>" placeholder="user, entity id, remarks, hash, tx..." />
-        </div>
-
-        <div class="col-6 col-lg-2">
-          <label class="form-label small mb-1">Action</label>
-          <select class="form-select" name="action">
-            <option value="">All</option>
-            <% (actionList || []).forEach(a => { %>
-              <option value="<%= a %>" <%= (action === a ? 'selected' : '') %>><%= a %></option>
-            <% }) %>
-          </select>
-        </div>
-
-        <div class="col-6 col-lg-2">
-          <label class="form-label small mb-1">Entity</label>
-          <select class="form-select" name="entity">
-            <option value="">All</option>
-            <% (entityList || []).forEach(e => { %>
-              <option value="<%= e %>" <%= (entity === e ? 'selected' : '') %>><%= e %></option>
-            <% }) %>
-          </select>
-        </div>
-
-        <div class="col-6 col-lg-2">
-          <label class="form-label small mb-1">Blockchain</label>
-          <select class="form-select" name="anchored">
-            <option value="" <%= (!anchored ? 'selected' : '') %>>All</option>
-            <option value="anchored" <%= (anchored === 'anchored' ? 'selected' : '') %>>Anchored</option>
-            <option value="pending" <%= (anchored === 'pending' ? 'selected' : '') %>>Pending</option>
-          </select>
-        </div>
-
-        <div class="col-6 col-lg-2">
-          <label class="form-label small mb-1">Per page</label>
-          <select class="form-select" name="perPage">
-            <% [10,20,50,100].forEach(n => { %>
-              <option value="<%= n %>" <%= (Number(perPage) === n ? 'selected' : '') %>><%= n %></option>
-            <% }) %>
-          </select>
-        </div>
-
-        <div class="col-6 col-lg-2">
-          <label class="form-label small mb-1">From</label>
-          <input type="date" class="form-control" name="from" value="<%= from || '' %>"/>
-        </div>
-
-        <div class="col-6 col-lg-2">
-          <label class="form-label small mb-1">To</label>
-          <input type="date" class="form-control" name="to" value="<%= to || '' %>"/>
-        </div>
-
-        <div class="col-12 col-lg-4">
-          <label class="form-label small mb-1">Batch ID (import/anchor)</label>
-          <input class="form-control" name="batchId" value="<%= batchId || '' %>" placeholder="paste batch id"/>
-        </div>
-
-        <div class="col-12 d-flex gap-2 mt-2">
-          <button class="btn btn-primary">Apply</button>
-          <a class="btn btn-outline-secondary" href="/auditLog">Reset</a>
-        </div>
-      </div>
-    </div>
-  </form>
 
   <!-- ================= AUDIT SUMMARY CARDS ================= -->
   <%
@@ -237,6 +169,81 @@
   </div>
 
   <!-- ======================================================= -->
+
+
+  <!-- ================= FILTERS & CONTROLS ================= -->
+
+  <form class="card border-0 shadow-sm mb-3" method="GET" action="/auditLog">
+    <div class="card-body">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-lg-4">
+          <label class="form-label small mb-1">Search</label>
+          <input class="form-control" name="q" value="<%= q || '' %>" placeholder="user, entity id, remarks, hash, tx..." />
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <label class="form-label small mb-1">Action</label>
+          <select class="form-select" name="action">
+            <option value="">All</option>
+            <% (actionList || []).forEach(a => { %>
+              <option value="<%= a %>" <%= (action === a ? 'selected' : '') %>><%= a %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <label class="form-label small mb-1">Entity</label>
+          <select class="form-select" name="entity">
+            <option value="">All</option>
+            <% (entityList || []).forEach(e => { %>
+              <option value="<%= e %>" <%= (entity === e ? 'selected' : '') %>><%= e %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <label class="form-label small mb-1">Blockchain</label>
+          <select class="form-select" name="anchored">
+            <option value="" <%= (!anchored ? 'selected' : '') %>>All</option>
+            <option value="anchored" <%= (anchored === 'anchored' ? 'selected' : '') %>>Anchored</option>
+            <option value="pending" <%= (anchored === 'pending' ? 'selected' : '') %>>Pending</option>
+          </select>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <label class="form-label small mb-1">Per page</label>
+          <select class="form-select" name="perPage">
+            <% [10,20,50,100].forEach(n => { %>
+              <option value="<%= n %>" <%= (Number(perPage) === n ? 'selected' : '') %>><%= n %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <label class="form-label small mb-1">From</label>
+          <input type="date" class="form-control" name="from" value="<%= from || '' %>"/>
+        </div>
+
+        <div class="col-6 col-lg-2">
+          <label class="form-label small mb-1">To</label>
+          <input type="date" class="form-control" name="to" value="<%= to || '' %>"/>
+        </div>
+
+        <div class="col-12 col-lg-4">
+          <label class="form-label small mb-1">Batch ID (import/anchor)</label>
+          <input class="form-control" name="batchId" value="<%= batchId || '' %>" placeholder="paste batch id"/>
+        </div>
+
+        <div class="col-12 d-flex gap-2 mt-2">
+          <button class="btn btn-primary">Apply</button>
+          <a class="btn btn-outline-secondary" href="/auditLog">Reset</a>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <!-- ======================================================= -->
+
 
   <button id="exportExcel" class="btn btn-success mb-3">Export to Excel</button>
 
