@@ -170,6 +170,94 @@
 
   <!-- ======================================================= -->
 
+  <%
+    const sodWarnings = [];
+    if ((stats?.operationsActions || 0) > 0 && (stats?.roleUpdates || 0) > 0) {
+      sodWarnings.push("Operations role performed ROLE_UPDATE actions (SoD risk).");
+    }
+    if ((stats?.courierActions || 0) > 0 && (stats?.importDeliveries || 0) > 0) {
+      sodWarnings.push("Courier role performed IMPORT_DELIVERIES actions (unexpected behaviour).");
+    }
+  %>
+
+  <% if (sodWarnings.length) { %>
+    <div class="alert alert-danger shadow-sm mb-3">
+      <strong>⚠ Segregation of Duties Alerts</strong>
+      <ul class="mb-0">
+        <% sodWarnings.forEach(w => { %>
+          <li><%= w %></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+
+
+    <button id="exportPdf" class="btn btn-outline-dark" style="background-color: green; color: white;">Export Charts to PDF</button>
+    <p> </p>
+  <!-- ================= AUDIT CHARTS ================= -->
+<div id="auditCharts">
+
+  <div class="row g-3 mb-3">
+
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Actions Over Time</h6>
+          <canvas id="chartActionsOverTime" height="140"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Actions by Type</h6>
+          <canvas id="chartActionsByType"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Actions by Role</h6>
+          <canvas id="chartActionsByRole"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Top Active Users</h6>
+          <canvas id="chartTopUsers"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Login vs Failed Login</h6>
+          <canvas id="chartLoginVsFailed"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Status Updates vs Exceptions</h6>
+          <canvas id="chartStatusVsExceptions" height="140"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+  <!-- ======================================================= -->
 
   <!-- ================= FILTERS & CONTROLS ================= -->
 
@@ -244,8 +332,13 @@
 
   <!-- ======================================================= -->
 
+  <!-- ================= Export ================= -->
 
-  <button id="exportExcel" class="btn btn-success mb-3">Export to Excel</button>
+  <div class="d-flex gap-2 mb-3">
+    <button id="exportExcel" class="btn btn-success">Export to Excel</button>
+  </div>
+
+  <!-- ======================================================= -->
 
   <table class="table table-bordered table-striped table-sm align-middle">
     <thead class="table-dark">
@@ -431,8 +524,174 @@
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
   
   <script>
+    const CHART = JSON.parse('<%- JSON.stringify(chartData || {}) %>');
+
+    const RED = "rgba(255,99,132,0.9)";
+    const palette = [
+      "rgba(54,162,235,0.75)",
+      "rgba(75,192,192,0.75)",
+      "rgba(255,159,64,0.75)",
+      "rgba(153,102,255,0.75)",
+      "rgba(255,205,86,0.75)",
+      "rgba(201,203,207,0.75)",
+      "rgba(99,255,132,0.75)",
+      "rgba(235,54,162,0.75)",
+    ];
+
+    function colorsForLabels(labels, forceRedSet = new Set()) {
+      return (labels || []).map((lab, i) => {
+        const key = String(lab);
+        if (forceRedSet.has(key)) return RED;
+        return palette[i % palette.length];
+      });
+    }
+
+    function goFilter(params) {
+      const url = new URL(window.location.href);
+      Object.entries(params).forEach(([k, v]) => {
+        if (v === null || v === undefined || v === "") url.searchParams.delete(k);
+        else url.searchParams.set(k, String(v));
+      });
+      url.searchParams.set("page", "1");
+      window.location.href = url.toString();
+    }
+
+    function makeBar(id, labels, data, forceRedSet, onClick) {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const bg = colorsForLabels(labels, forceRedSet);
+
+      return new Chart(el, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Count",
+            data,
+            backgroundColor: bg,
+            borderColor: bg
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+          onClick
+        }
+      });
+    }
+
+    // ✅ 1) Actions Over Time (Line) — ensure it shows
+    (() => {
+      const el = document.getElementById("chartActionsOverTime");
+      if (!el) return;
+
+      const d = CHART.actionsOverTime || { labels: [], total: [], importDeliveries: [], updateStatus: [] };
+
+      new Chart(el, {
+        type: "line",
+        data: {
+          labels: d.labels || [],
+          datasets: [
+            {
+              label: "Total",
+              data: d.total || [],
+              borderColor: "rgba(54,162,235,0.9)",
+              backgroundColor: "rgba(54,162,235,0.25)",
+              fill: false,
+              tension: 0.35
+            },
+            {
+              label: "IMPORT_DELIVERIES",
+              data: d.importDeliveries || [],
+              borderColor: "rgba(255,159,64,0.9)",
+              backgroundColor: "rgba(255,159,64,0.25)",
+              fill: false,
+              tension: 0.35
+            },
+            {
+              label: "UPDATE_STATUS",
+              data: d.updateStatus || [],
+              borderColor: "rgba(75,192,192,0.9)",
+              backgroundColor: "rgba(75,192,192,0.25)",
+              fill: false,
+              tension: 0.35
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: "top" } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    })();
+
+    // ✅ 2) Actions by Type — each bar different, sensitive reveal RED, clickable
+    makeBar(
+      "chartActionsByType",
+      (CHART.actionsByType?.labels || []),
+      (CHART.actionsByType?.counts || []),
+      new Set(["SENSITIVE_REVEAL_GRANTED", "SENSITIVE_REVEAL", "SENSITIVE_REVEAL_GRANTED", "REVEAL", "REVEAL_SENSITIVE"]),
+      (evt, elements, chart) => {
+        if (!elements.length) return;
+        const action = chart.data.labels[elements[0].index];
+        goFilter({ action });
+      }
+    );
+
+    // ✅ 3) Actions by Role — each bar different, unknown RED (your backend makes order stable)
+    makeBar(
+      "chartActionsByRole",
+      (CHART.actionsByRole?.labels || []),
+      (CHART.actionsByRole?.counts || []),
+      new Set(["unknown"]),
+      null
+    );
+
+    // ✅ 4) Top Users — each bar different, clickable (filters search q)
+    makeBar(
+      "chartTopUsers",
+      (CHART.topUsers?.labels || []),
+      (CHART.topUsers?.counts || []),
+      new Set([]),
+      (evt, elements, chart) => {
+        if (!elements.length) return;
+        const username = chart.data.labels[elements[0].index];
+        goFilter({ q: username });
+      }
+    );
+
+    // ✅ 5) Login vs Failed Login — failed RED, clickable
+    makeBar(
+      "chartLoginVsFailed",
+      (CHART.loginVsFailed?.labels || ["LOGIN", "FAILED_LOGIN"]),
+      (CHART.loginVsFailed?.counts || [0, 0]),
+      new Set(["FAILED_LOGIN"]),
+      (evt, elements, chart) => {
+        if (!elements.length) return;
+        const a = chart.data.labels[elements[0].index];
+        goFilter({ action: a });
+      }
+    );
+
+    // ✅ 6) Status Updates vs Exceptions — failed deliveries RED, should show
+    makeBar(
+      "chartStatusVsExceptions",
+      (CHART.statusVsExceptions?.labels || ["UPDATE_STATUS", "FAILED_DELIVERIES"]),
+      (CHART.statusVsExceptions?.counts || [0, 0]),
+      new Set(["FAILED_DELIVERIES"]),
+      null
+    );
+
+
     // =========================
     // 1) IMPORT COLLAPSE TOGGLE
     // =========================
@@ -533,6 +792,69 @@
       });
     });
 
+    // =========================
+    // 2) PDF EXPORT (CHARTS ONLY)
+    // =========================
+    document.getElementById("exportPdf")?.addEventListener("click", async () => {
+      try {
+        console.log("[PDF] clicked");
+
+        if (!window.html2canvas) {
+          alert("html2canvas not loaded. Check the script include.");
+          return;
+        }
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          alert("jsPDF not loaded. Check the script include.");
+          return;
+        }
+
+        const chartsEl = document.getElementById("auditCharts");
+        if (!chartsEl) {
+          alert("Cannot find #auditCharts. Your charts must be inside <div id='auditCharts'>...</div>.");
+          return;
+        }
+
+        // Render charts section to canvas
+        const canvas = await html2canvas(chartsEl, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: -window.scrollY,
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const { jsPDF } = window.jspdf;
+
+        // A4 portrait
+        const pdf = new jsPDF("p", "mm", "a4");
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        // Fit image to page width
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        // Multi-page support
+        let position = 0;
+        let heightLeft = imgHeight;
+
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+
+        while (heightLeft > 0) {
+          pdf.addPage();
+          position = heightLeft - imgHeight; // shift up on next page
+          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+
+        pdf.save("audit_charts.pdf");
+      } catch (err) {
+        console.error("[PDF][ERROR]", err);
+        alert("Export failed: " + (err?.message || err));
+      }
+    });
     // =========================
     // 2) EXCEL EXPORT
     // =========================
