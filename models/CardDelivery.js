@@ -27,4 +27,7 @@ const cardDeliverySchema = new mongoose.Schema(
   }
 );
 
+// ✅ Add compound index to prevent duplicates and improve duplicate detection queries
+cardDeliverySchema.index({ card_number: 1, recipient_name: 1, address: 1 });
+
 module.exports = mongoose.model("CardDelivery", cardDeliverySchema);

@@ -223,9 +223,8 @@ router.post("/", deliveryValidationRules, async (req, res) => {
 
 // ==========================
 // POST /deliveries/import
-// ✅ Option A: assign printer
-// - If form provides assigned_printer_id, use it
-// - Else leave null (admin/ops importing)
+// - If form provides assigned_printer_id,
+// - Else null 
 // ==========================
 router.post("/import", upload.single("excel_file"), async (req, res) => {
   try {
@@ -244,6 +243,9 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
 
     const docs = [];
     let invalidCount = 0;
+    let duplicateCount = 0;
+    let updatedCount = 0;
+    const toDelete = [];
 
     for (const row of rows) {
       if (!validateProgressiveRow(row)) {
@@ -256,6 +258,43 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       const address = buildAddress(row);
       const courier = String(row["PORT"] ?? "-").trim() || "-";
       const status = mapFileStatusToAppStatus(row["STATUS"]);
+
+      // Check for duplicate: same card_number, recipient_name, and address
+      const existingDelivery = await CardDelivery.findOne({
+        card_number: card_number,
+        recipient_name: recipient_name,
+        address: address,
+      }).lean();
+
+      if (existingDelivery) {
+        // If status is different, delete old entry and insert new one
+        if (existingDelivery.status !== status) {
+          console.log(`[Import] Status change detected: ${card_number} - ${recipient_name} (${existingDelivery.status} → ${status})`);
+          toDelete.push(existingDelivery._id);
+          updatedCount++;
+
+          docs.push({
+            card_number,
+            recipient_name,
+            address,
+            courier,
+            status,
+            updated_at: new Date(),
+
+            import_batch_id: batchId,
+            imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
+            imported_at: new Date(),
+
+            // Option A assignment
+            assigned_printer: assignedPrinterId, // ObjectId string or null
+          });
+        } else {
+          // Status is the same, skip as duplicate
+          console.log(`[Import] Skipping duplicate: ${card_number} - ${recipient_name}`);
+          duplicateCount++;
+        }
+        continue;
+      }
 
       docs.push({
         card_number,
@@ -274,20 +313,26 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       });
     }
 
+    // Delete old entries before inserting new ones
+    if (toDelete.length > 0) {
+      await CardDelivery.deleteMany({ _id: { $in: toDelete } });
+      console.log(`[Import] Deleted ${toDelete.length} old entries for status updates`);
+    }
+
     if (docs.length === 0) {
       console.warn("[Import] No valid rows found in file");
       return res.redirect("/deliveries");
     }
 
     const result = await CardDelivery.insertMany(docs);
-    console.log(`[Import] Inserted ${result.length}. Invalid: ${invalidCount}`);
+    console.log(`[Import] Inserted ${result.length}. Invalid: ${invalidCount}. Duplicates: ${duplicateCount}. Updated: ${updatedCount}`);
 
     await addAuditLog(req, {
       action_type: "IMPORT_DELIVERIES",
       entity_type: "CardDelivery",
       entity_id: "BULK",
       source: "Deliveries Import",
-      remarks: `Imported ${result.length} deliveries. Skipped ${invalidCount} invalid rows.`,
+      remarks: `Imported ${result.length} deliveries. Skipped ${invalidCount} invalid rows, ${duplicateCount} duplicates, and updated ${updatedCount} entries with status changes.`,
       import_batch_id: batchId, // ✅ needed for auditLog expand “View”
     });
 
