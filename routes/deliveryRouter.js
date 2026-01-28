@@ -60,9 +60,23 @@ function parseProgressiveReportRows(sheet) {
 
   for (let i = 0; i < matrix.length; i++) {
     const row = matrix[i].map(toUpperTrim);
-    if (row.includes("REFERENCE NUMBER") && row.includes("NAME") && row.includes("ADDRESS1")) {
+    // Look for headers that include STATUS (which is the Progressive Report section)
+    if (row.includes("STATUS") && row.includes("NAME") && row.includes("ADDRESS1")) {
       headerRowIndex = i;
+      console.log("[Import Parser] Found Progressive Report section with STATUS at row", i);
       break;
+    }
+  }
+
+  // If not found, fallback to the first section without status
+  if (headerRowIndex === -1) {
+    for (let i = 0; i < matrix.length; i++) {
+      const row = matrix[i].map(toUpperTrim);
+      if (row.includes("REFERENCE NUMBER") && row.includes("NAME") && row.includes("ADDRESS1")) {
+        headerRowIndex = i;
+        console.log("[Import Parser] Found Dispatch List section at row", i);
+        break;
+      }
     }
   }
 
@@ -71,6 +85,7 @@ function parseProgressiveReportRows(sheet) {
       const row = matrix[i].map(toUpperTrim);
       if (row.includes("NAME") && row.includes("ADDRESS1")) {
         headerRowIndex = i;
+        console.log("[Import Parser] Found basic header at row", i);
         break;
       }
     }
@@ -79,6 +94,10 @@ function parseProgressiveReportRows(sheet) {
   if (headerRowIndex === -1) return [];
 
   const headers = matrix[headerRowIndex].map((h) => String(h).trim());
+  
+  // Debug logging to see what columns are detected
+  console.log("[Import Parser] Detected headers:", headers);
+
   const out = [];
 
   for (let r = headerRowIndex + 1; r < matrix.length; r++) {
@@ -87,6 +106,11 @@ function parseProgressiveReportRows(sheet) {
     if (!hasAny) continue;
 
     const obj = {};
+    // Store numeric indices for direct column access
+    for (let c = 0; c < row.length; c++) {
+      obj[c] = row[c];
+    }
+    // Also store named properties from headers
     for (let c = 0; c < headers.length; c++) {
       const key = headers[c];
       if (!key) continue;
@@ -106,6 +130,19 @@ function pickCardNumber(row) {
 
   const awb = String(row["AWB NUMBER"] ?? "").trim();
   if (cleanDigits(awb).length > 0) return awb;
+
+  return "";
+}
+
+/** Pick status from row - gets from column O (index 14) */
+function pickStatus(row) {
+  //  Get value directly from column O (index 14)
+  let value = String(row[14] ?? "").trim();
+  if (value) return value;
+
+  //  Fallback: check for STATUS column header
+  value = String(row["STATUS"] ?? "").trim();
+  if (value) return value;
 
   return "";
 }
@@ -140,12 +177,16 @@ function buildAddress(row) {
 }
 
 function mapFileStatusToAppStatus(fileStatus) {
-  const s = toUpperTrim(fileStatus);
-  if (s === "DELIVERED") return "Delivered";
-  if (s === "IN TRANSIT") return "Handed to Courier";
-  if (s.includes("BAD") || s.includes("DOUBLE")) return "Not Found";
-  if (!s) return "Pending";
-  return "Pending";
+  // ✅ Just return whatever is in the STATUS column as-is
+  const s = String(fileStatus ?? "").trim();
+  
+  // ✅ Log what we're getting
+  if (s) {
+    console.log(`[Import] Raw status value: "${s}"`);
+  }
+  
+  // Return the raw value, or empty string if nothing
+  return s || "";
 }
 
 // ==========================
@@ -245,7 +286,6 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
     let invalidCount = 0;
     let duplicateCount = 0;
     let updatedCount = 0;
-    const toDelete = [];
 
     for (const row of rows) {
       if (!validateProgressiveRow(row)) {
@@ -257,7 +297,11 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       const recipient_name = String(row["NAME"] ?? "").trim();
       const address = buildAddress(row);
       const courier = String(row["PORT"] ?? "-").trim() || "-";
-      const status = mapFileStatusToAppStatus(row["STATUS"]);
+      const pickedStatus = pickStatus(row);
+      const status = mapFileStatusToAppStatus(pickedStatus);
+
+      // ✅ Debug logging to see what status is being extracted
+      console.log(`[Import] Row: ${card_number} | Picked Status: "${pickedStatus}" | Mapped Status: "${status}"`);
 
       // Check for duplicate: same card_number, recipient_name, and address
       const existingDelivery = await CardDelivery.findOne({
@@ -267,30 +311,38 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       }).lean();
 
       if (existingDelivery) {
-        // If status is different, delete old entry and insert new one
-        if (existingDelivery.status !== status) {
+        // ✅ Only update if the new status is non-empty AND different from existing
+        if (status && existingDelivery.status !== status) {
           console.log(`[Import] Status change detected: ${card_number} - ${recipient_name} (${existingDelivery.status} → ${status})`);
-          toDelete.push(existingDelivery._id);
+          
+          // ✅ Update status AND assign to current batch so it shows in the session
+          await CardDelivery.updateOne(
+            { _id: existingDelivery._id },
+            { 
+              $set: { 
+                status: status,
+                updated_at: new Date(),
+                import_batch_id: batchId,
+                imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
+                imported_at: new Date()
+              } 
+            }
+          );
+          
           updatedCount++;
-
-          docs.push({
-            card_number,
-            recipient_name,
-            address,
-            courier,
-            status,
-            updated_at: new Date(),
-
+          
+          // ✅ Log the status update in audit trail
+          await addAuditLog(req, {
+            action_type: "UPDATE_DELIVERY_STATUS",
+            entity_type: "CardDelivery",
+            entity_id: existingDelivery._id.toString(),
+            source: "Import (Status Update)",
+            remarks: `Status updated via import for card **** **** **** ${last4(card_number)}: ${existingDelivery.status} → ${status}`,
             import_batch_id: batchId,
-            imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
-            imported_at: new Date(),
-
-            // Option A assignment
-            assigned_printer: assignedPrinterId, // ObjectId string or null
           });
         } else {
-          // Status is the same, skip as duplicate
-          console.log(`[Import] Skipping duplicate: ${card_number} - ${recipient_name}`);
+          // Status is empty or same, skip as duplicate
+          console.log(`[Import] Skipping duplicate: ${card_number} - ${recipient_name} (status: "${status}")`);
           duplicateCount++;
         }
         continue;
@@ -313,18 +365,15 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       });
     }
 
-    // Delete old entries before inserting new ones
-    if (toDelete.length > 0) {
-      await CardDelivery.deleteMany({ _id: { $in: toDelete } });
-      console.log(`[Import] Deleted ${toDelete.length} old entries for status updates`);
-    }
-
-    if (docs.length === 0) {
+    if (docs.length === 0 && updatedCount === 0) {
       console.warn("[Import] No valid rows found in file");
       return res.redirect("/deliveries");
     }
 
-    const result = await CardDelivery.insertMany(docs);
+    let result = [];
+    if (docs.length > 0) {
+      result = await CardDelivery.insertMany(docs);
+    }
     console.log(`[Import] Inserted ${result.length}. Invalid: ${invalidCount}. Duplicates: ${duplicateCount}. Updated: ${updatedCount}`);
 
     await addAuditLog(req, {
@@ -332,7 +381,7 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       entity_type: "CardDelivery",
       entity_id: "BULK",
       source: "Deliveries Import",
-      remarks: `Imported ${result.length} deliveries. Skipped ${invalidCount} invalid rows, ${duplicateCount} duplicates, and updated ${updatedCount} entries with status changes.`,
+      remarks: `Imported ${result.length} new deliveries. Skipped ${invalidCount} invalid rows, ${duplicateCount} duplicates, and updated ${updatedCount} existing entries with status changes.`,
       import_batch_id: batchId, // ✅ needed for auditLog expand “View”
     });
 

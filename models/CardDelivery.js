@@ -13,7 +13,7 @@ const cardDeliverySchema = new mongoose.Schema(
     recipient_name: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
     courier: { type: String, trim: true, default: "-" },
-    status: { type: String, enum: STATUS, default: "Pending" },
+    status: { type: String, default: "Pending" },
     updated_at: { type: Date, default: Date.now },
     
     assigned_printer: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
