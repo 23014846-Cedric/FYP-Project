@@ -90,7 +90,7 @@
                 <li class="nav-item">
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
                 </li>
-            <% } else if (user) { %>
+            <% } else if (user && user.role === "operations") { %>
                 <!-- NORMAL LOGGED-IN USER MENU -->
                 <li class="nav-item">
                     <a class="nav-link" href="/profile">Profile</a>
@@ -106,8 +106,17 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>               
-
+                </li>      
+            <% } else if (user && user.role === "courier") { %>
+                <!-- NORMAL LOGGED-IN USER MENU -->
+                <li class="nav-item">
+                    <a class="nav-link" href="/profile">Profile</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/courier/deliveries">My Deliveries</a>
+                <li class="nav-item">
+                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+                </li>            
             <% }  else { %>
                 <!-- GUEST MENU -->
                 <li class="nav-item">
