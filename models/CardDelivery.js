@@ -13,7 +13,7 @@ const cardDeliverySchema = new mongoose.Schema(
     recipient_name: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
     courier: { type: String, trim: true, default: "-" },
-    status: { type: String, enum: STATUS, default: "Pending" },
+    status: { type: String, default: "Pending" },
     updated_at: { type: Date, default: Date.now },
     
     assigned_printer: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
@@ -26,5 +26,8 @@ const cardDeliverySchema = new mongoose.Schema(
     timestamps: { createdAt: "created_at", updatedAt: false },
   }
 );
+
+// ✅ Add compound index to prevent duplicates and improve duplicate detection queries
+cardDeliverySchema.index({ card_number: 1, recipient_name: 1, address: 1 });
 
 module.exports = mongoose.model("CardDelivery", cardDeliverySchema);

@@ -4,6 +4,7 @@ const crypto = require("crypto");
 
 const auditLogSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
+  action_timestamp: {type: Date,default: Date.now},
 
   username: { type: String, default: "System" },
   user_id: { type: String },

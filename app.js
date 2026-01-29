@@ -15,6 +15,7 @@ const { maskCard, maskAddress } = require('./utils/mask');
 // Models
 const CardDelivery  = require('./models/CardDelivery');
 const ErrorLog = require("./models/ErrorLog");
+const User = require("./models/User");
 
 // Routers
 const contactRouter   = require('./routes/contactRouter');
@@ -34,6 +35,7 @@ const courierRouter = require("./routes/courierRouter");
 const authMiddleware = require('./middleware/authMiddleware');
 const requireRole = require('./middleware/requireRole');
 const revealMiddleware = require("./middleware/revealMiddleware");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -308,6 +310,243 @@ app.get("/auditLog", authMiddleware, async (req, res) => {
       .limit(perPage)
       .lean();
 
+    // =======================
+    // AUDIT PAGE CHART DATA
+    // =======================
+
+    // last 14 days window
+    // 1️⃣ Actions Over Time
+    const days = 14;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - (days - 1));
+    startDate.setHours(0, 0, 0, 0);
+
+    const trendAgg = await AuditLog.aggregate([
+      { $match: { ...filter, timestamp: { $gte: startDate } } },
+      {
+        $addFields: {
+          day: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } }
+        }
+      },
+      {
+        $group: {
+          _id: { day: "$day", action: "$action_type" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { "_id.day": 1 } }
+    ]);
+
+    const labels = [];
+    for (let i = 0; i < days; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
+      labels.push(d.toISOString().slice(0, 10));
+    }
+
+    const init = Object.fromEntries(labels.map(d => [d, 0]));
+    const totalMap = { ...init };
+    const importMap = { ...init };
+    const updateMap = { ...init };
+
+    trendAgg.forEach(r => {
+      totalMap[r._id.day] += r.count || 0;
+      if (r._id.action === "IMPORT_DELIVERIES") importMap[r._id.day] += r.count;
+      if (r._id.action === "UPDATE_STATUS") updateMap[r._id.day] += r.count;
+    });
+
+    const actionsOverTime = {
+      labels,
+      total: labels.map(d => totalMap[d]),
+      importDeliveries: labels.map(d => importMap[d]),
+      updateStatus: labels.map(d => updateMap[d]),
+    };
+
+
+    // 2️⃣ Actions by Type (stable)
+    // =====================
+    const actionsByTypeAgg = await AuditLog.aggregate([
+      { $match: filter },
+      { $group: { _id: "$action_type", count: { $sum: 1 } } }
+    ]);
+
+    actionsByTypeAgg.sort((a, b) =>
+      String(a._id).localeCompare(String(b._id))
+    );
+
+    const actionsByType = {
+      labels: actionsByTypeAgg.map(x => x._id || "UNKNOWN"),
+      counts: actionsByTypeAgg.map(x => x.count || 0),
+    };
+
+
+  // 3️⃣ Actions by Role (FIXED ORDER — does not jump)
+  const rolesFixed = ["admin", "operations", "printer", "courier", "unknown"];
+  const roleCountMap = Object.fromEntries(rolesFixed.map(r => [r, 0]));
+
+  const roleAgg = await AuditLog.aggregate([
+    { $match: filter },
+    {
+      $addFields: {
+        userObjId: {
+          $convert: { input: "$user_id", to: "objectId", onError: null, onNull: null }
+        }
+      }
+    },
+    { $lookup: { from: "users", localField: "userObjId", foreignField: "_id", as: "u" } },
+    { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+    {
+      $group: {
+        _id: { $ifNull: ["$u.role", "unknown"] },   // ✅ puts missing users into "unknown"
+        count: { $sum: 1 }
+      }
+    }
+  ]);
+
+  // Fill stable map
+  roleAgg.forEach(r => {
+    const role = r._id || "unknown";
+    if (roleCountMap[role] !== undefined) roleCountMap[role] = r.count || 0;
+  });
+
+// ✅ Now build stable labels + counts for chartData
+const actionsByRole = {
+  labels: rolesFixed,                      // ✅ stable order
+  counts: rolesFixed.map(r => roleCountMap[r]),
+};
+
+
+    // 4️⃣ Top Users
+    // =====================
+    const topUsersAgg = await AuditLog.aggregate([
+      { $match: filter },
+      { $group: { _id: "$username", count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } }, // stable
+      { $limit: 10 }
+    ]);
+
+const topUsers = {
+  labels: topUsersAgg.map(x => x._id || "Unknown"),
+  counts: topUsersAgg.map(x => x.count || 0),
+};
+
+
+    // 5️⃣ Login vs Failed
+    // =====================
+    const loginAgg = await AuditLog.aggregate([
+      { $match: { ...filter, action_type: { $in: ["LOGIN", "FAILED_LOGIN"] } } },
+      { $group: { _id: "$action_type", count: { $sum: 1 } } }
+    ]);
+
+    const loginMap = { LOGIN: 0, FAILED_LOGIN: 0 };
+    loginAgg.forEach(r => {
+      if (loginMap[r._id] !== undefined) loginMap[r._id] = r.count;
+    });
+
+    const loginVsFailed = {
+      labels: ["LOGIN", "FAILED_LOGIN"],
+      counts: [loginMap.LOGIN, loginMap.FAILED_LOGIN],
+    };
+
+
+    // 6️⃣ Status vs Exceptions
+    const statusUpdateCount = await AuditLog.countDocuments({
+    ...filter,
+    action_type: "UPDATE_STATUS"
+  });
+
+  const failedDeliveriesCount = await CardDelivery.countDocuments({
+    status: "Failed"
+  });
+
+  const statusVsExceptions = {
+  labels: ["UPDATE_STATUS", "FAILED_DELIVERIES"],
+  counts: [statusUpdateCount, failedDeliveriesCount],
+  };
+
+    const chartData = {
+      actionsOverTime,
+      actionsByType,
+      actionsByRole,
+      topUsers,
+      loginVsFailed,
+      statusVsExceptions,
+};
+
+
+    // =======================
+    // AUDIT PAGE STAT CARDS
+    // =======================
+    const [totalUsers, facets] = await Promise.all([
+      User.countDocuments({}),
+      AuditLog.aggregate([
+        { $match: filter },
+        {
+          $facet: {
+            roleCounts: [
+              {
+                $addFields: {
+                  userObjId: {
+                    $convert: {
+                      input: "$user_id",
+                      to: "objectId",
+                      onError: null,
+                      onNull: null,
+                    },
+                  },
+                },
+              },
+              {
+                $lookup: {
+                  from: "users",
+                  localField: "userObjId",
+                  foreignField: "_id",
+                  as: "u",
+                },
+              },
+              { $unwind: { path: "$u", preserveNullAndEmptyArrays: true } },
+              { $group: { _id: "$u.role", count: { $sum: 1 } } },
+            ],
+            actionCounts: [
+              { $group: { _id: "$action_type", count: { $sum: 1 } } }
+            ],
+            anchorCounts: [
+              { $group: { _id: "$anchored", count: { $sum: 1 } } }
+            ],
+          },
+        },
+      ]),
+    ]);
+
+    const facet = facets?.[0] || { roleCounts: [], actionCounts: [], anchorCounts: [] };
+
+    const roleMap = {};
+    facet.roleCounts.forEach(r => { if (r?._id) roleMap[r._id] = r.count; });
+
+    const actionMap = {};
+    facet.actionCounts.forEach(a => { if (a?._id) actionMap[a._id] = a.count; });
+
+    let anchoredCount = 0;
+    let pendingCount = 0;
+    facet.anchorCounts.forEach(a => {
+      if (a._id === true) anchoredCount = a.count;
+      if (a._id === false) pendingCount = a.count;
+    });
+
+    const stats = {
+      totalUsers,
+      adminActions: roleMap.admin || 0,
+      operationsActions: roleMap.operations || 0,
+      courierActions: roleMap.courier || 0,
+      printerActions: roleMap.printer || 0,
+      blockchainAnchored: anchoredCount,
+      blockchainPending: pendingCount,
+      updateStatus: actionMap.UPDATE_STATUS || 0,
+      importDeliveries: actionMap.IMPORT_DELIVERIES || 0,
+      roleUpdates: actionMap.ROLE_UPDATE || 0,
+    };
+
+
     // dropdown lists (simple demo list; replace with your real action/entity list)
     const actionList = ["LOGIN","LOGOUT","UPDATE_STATUS","IMPORT_DELIVERIES","ROLE_UPDATE"];
     const entityList = ["User","Delivery","Batch","System"];
@@ -326,6 +565,8 @@ app.get("/auditLog", authMiddleware, async (req, res) => {
       to,
       actionList,
       entityList,
+      stats,
+      chartData,
     });
   } catch (err) {
     console.error("Error loading auditLog:", err);
@@ -343,6 +584,18 @@ app.get("/auditLog", authMiddleware, async (req, res) => {
       to: "",
       actionList: [],
       entityList: [],
+      stats: {
+        totalUsers: 0,
+        adminActions: 0,
+        operationsActions: 0,
+        courierActions: 0,
+        printerActions: 0,
+        blockchainAnchored: 0,
+        blockchainPending: 0,
+        updateStatus: 0,
+        importDeliveries: 0,
+        roleUpdates: 0,
+      },
     });
   }
 });
@@ -407,6 +660,14 @@ app.use(
   requireRole('admin'),
   auditRouter
 );
+
+// -------------------- ERROR HANDLING (LAST) --------------------
+app.use(notFound);
+app.use(errorHandler);
+app.get("/test-error", (req, res) => {
+  throw new Error("TEST: centralized error middleware works");
+});
+
 
 // -------------------- DATABASE & SERVER --------------------
 

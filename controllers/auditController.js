@@ -1,12 +1,12 @@
 // controllers/auditController.js
 const AuditLog = require("../models/AuditLog");
+const { asyncHandler } = require("../utils/errorLogger");
 
 function escapeRegex(input = "") {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-exports.getAuditLogs = async (req, res) => {
-  try {
+exports.getAuditLogs = asyncHandler(async (req, res) => {
     const q = (req.query.q || "").trim();
     const action = (req.query.action || "").trim();
     const entity = (req.query.entity || "").trim();
@@ -89,9 +89,5 @@ exports.getAuditLogs = async (req, res) => {
         sortFields: allowedSort,
       },
     });
-  } catch (err) {
-    console.error("Error loading audit logs:", err);
-    return res.status(500).send("Error loading audit logs");
-  }
-};
+});
 
