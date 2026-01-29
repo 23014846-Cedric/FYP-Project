@@ -10,6 +10,7 @@ const SALT = 10;
 
 // Move this to .env later: process.env.ADMIN_SECRET
 const ADMIN_SECRET = process.env.ADMIN_SECRET || "MY_SUPER_SECRET_ADMIN_CODE";
+const COURIER_SECRET = process.env.COURIER_SECRET || "courier";
 
 // Helper to create JWT (for login later)
 const createToken = (user) =>
@@ -37,7 +38,7 @@ exports.showSignupForm = (req, res) => {
 // POST: handle signup
 exports.signup = async (req, res) => {
   try {
-    const { name, email, password, role, adminCode } = req.body;
+    const { name, email, password, role, adminCode, courierCode } = req.body;
 
     const formData = { name, email, role }; // for repopulating form
     const errors = [];
@@ -62,13 +63,22 @@ exports.signup = async (req, res) => {
       }
     }
 
+    // If user chose courier, verify courierCode
+    if (role === "courier") {
+      if (!courierCode) {
+        errors.push("Courier access code is required for courier role");
+      } else if (courierCode !== COURIER_SECRET) {
+        errors.push("Invalid courier access code");
+      }
+    }
+
     if (errors.length > 0) {
       return res.render("signup", { errors, formData });
     }
 
     const passwordHash = await bcrypt.hash(password, SALT);
 
-    const ALLOWED_ROLES = ["admin", "operations", "printer"];
+    const ALLOWED_ROLES = ["admin", "operations", "printer", "courier"];
 
     const normalizedRole = ALLOWED_ROLES.includes(role) ? role : "operations";
 
@@ -134,17 +144,12 @@ exports.signin = async (req, res) => {
 
     // Decide redirect path ONCE based on role
     let redirectPath = "/dashboard";
-
-    if (user.role === "compliance") {
-      // route is auditLog bruh
-      redirectPath = "/auditLog";
+    
+    if (user.role === "courier") {
+      redirectPath = "/courier/deliveries";
     } else if (user.role === "admin") {
       redirectPath = "/dashboard";
     } 
-    // You can add operations-specific path if you want:
-    // else if (user.role === "operations") {
-    //   redirectPath = "/operations/dashboard";
-    // }
 
     // Single redirect
     return res.redirect(redirectPath);

@@ -6,6 +6,8 @@ const mongoose      = require('mongoose');
 const cookieParser  = require('cookie-parser');
 const path          = require('path');
 const jwt           = require('jsonwebtoken');
+const session = require("express-session");
+const MongoStore = require("connect-mongo").default;
 
 // Utils
 const { maskCard, maskAddress } = require('./utils/mask');
@@ -27,6 +29,7 @@ const printerRouter = require("./routes/printerRouter");
 const revealRouter = require("./routes/revealRouter");
 const auditApiRouter = require("./routes/auditApiRouter");
 const importBatchApiRouter = require("./routes/importBatchApiRouter");
+const courierRouter = require("./routes/courierRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -50,6 +53,15 @@ app.use(express.json());
 
 // Cookies
 app.use(cookieParser());
+
+// Sessions
+app.use(session({
+  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({ mongoUrl: MONGO_URI, collectionName: "sessions" }),
+  cookie: { httpOnly: true, maxAge: 1000 * 60 * 60 * 8 }
+}));
 
 // Static assets
 app.use(express.static(path.join(__dirname, 'public')));
@@ -589,6 +601,9 @@ const topUsers = {
 });
 
 // -------------------- ROUTER MOUNTING --------------------
+
+// Courier routes (courier only)
+app.use("/courier", authMiddleware, requireRole(["courier"]), courierRouter);
 
 // Auth (login, logout, signup actions, etc.)
 app.use('/', authRouter);

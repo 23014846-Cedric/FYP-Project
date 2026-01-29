@@ -2,7 +2,7 @@
 const mongoose = require('mongoose');
 
 // Updated roles – business users only
-const ALLOWED_ROLES = ['admin', 'operations', 'printer'];
+const ALLOWED_ROLES = ['admin', 'operations', 'printer', 'courier'];
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
