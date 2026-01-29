@@ -451,18 +451,21 @@ const topUsers = {
 
     // 6️⃣ Status vs Exceptions
     const statusUpdateCount = await AuditLog.countDocuments({
-    ...filter,
-    action_type: "UPDATE_STATUS"
-  });
+      ...filter,
+      action_type: "UPDATE_STATUS",
+    });
 
-  const failedDeliveriesCount = await CardDelivery.countDocuments({
-    status: "Failed"
-  });
+    // IMPORTANT: this MUST match exceptionRouter.js
+    // Exceptions page shows: status != "Delivered"
+    const failedDeliveriesCount = await CardDelivery.countDocuments({
+      status: { $ne: "Delivered" },
+    });
 
-  const statusVsExceptions = {
-  labels: ["UPDATE_STATUS", "FAILED_DELIVERIES"],
-  counts: [statusUpdateCount, failedDeliveriesCount],
-  };
+    const statusVsExceptions = {
+      labels: ["UPDATE_STATUS", "FAILED_DELIVERIES"],
+      counts: [statusUpdateCount, failedDeliveriesCount],
+    };
+
 
     const chartData = {
       actionsOverTime,
