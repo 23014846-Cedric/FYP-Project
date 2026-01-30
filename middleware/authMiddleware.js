@@ -30,7 +30,6 @@ authMiddleware.requireRole = (role) => {
     }
 
     if (req.user.role !== role) {
-      // 🔥 Dynamic message, no more hard-coded "Compliance only"
       return res.status(403).send(`Access denied. ${role} only.`);
     }
 
