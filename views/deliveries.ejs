@@ -29,11 +29,11 @@
     </div>
 
     <div class="card-body">
-      <form action="/deliveries/import" method="POST" enctype="multipart/form-data">
+      <form action="/deliveries/import" method="POST" enctype="multipart/form-data" id="importForm" onsubmit="return confirmImport(event)">
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Upload Excel File</label>
-            <input type="file" name="excel_file" accept=".xlsx, .xls, .csv" class="form-control" required>
+            <input type="file" name="excel_file" accept=".xlsx, .xls, .csv" class="form-control" required id="excelFileInput">
           </div>
 
           <div class="col-md-3 d-flex align-items-end">
@@ -188,7 +188,7 @@
 <script>
 (() => {
   const tableBody = document.querySelector("tbody");
-  if (!tableBody) return; // ✅ no table yet, nothing to paginate/filter
+  if (!tableBody) return;
 
   const rows = Array.from(tableBody.querySelectorAll("tr"));
 
@@ -248,6 +248,28 @@
 
   render();
 })();
+
+// ✅ Confirmation dialog for Excel import
+function confirmImport(event) {
+  const fileInput = document.getElementById('excelFileInput');
+  const fileName = fileInput.files[0]?.name || 'No file selected';
+  
+  const confirmed = confirm(
+    `Are you sure you want to import the file: "${fileName}"?\n\n` +
+    `This will:\n` +
+    `• Add new delivery records\n` +
+    `• Update status for existing records if changed\n` +
+    `• Skip duplicate records with no changes\n\n` +
+    `Click OK to proceed or Cancel to abort.`
+  );
+  
+  if (!confirmed) {
+    event.preventDefault();
+    return false;
+  }
+  
+  return true;
+}
 </script>
 
 

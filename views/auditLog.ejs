@@ -60,6 +60,232 @@
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>System Activity Log</h1>
   </div>
+
+  <!-- ================= AUDIT TABS (ONLY ON THIS PAGE) ================= -->
+  <ul class="nav nav-tabs mb-3" id="auditTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-cards" data-bs-toggle="tab" data-bs-target="#pane-cards" type="button" role="tab">
+        Summary Cards
+      </button>
+    </li>
+
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-graphs" data-bs-toggle="tab" data-bs-target="#pane-graphs" type="button" role="tab">
+        Graphs
+      </button>
+    </li>
+
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-logs" data-bs-toggle="tab" data-bs-target="#pane-logs" type="button" role="tab">
+        Audit Logs
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="auditTabsContent">
+
+
+  <!-- ================= AUDIT SUMMARY CARDS ================= -->
+     <div class="tab-pane fade show active" id="pane-cards" role="tabpanel" aria-labelledby="tab-cards">
+
+  <%
+    const s = stats || {};
+    const num = (v) => (typeof v === "number" ? v : 0);
+  %>
+
+  <div class="row g-3 mb-3">
+    <!-- Total Users -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-primary">
+        <div class="card-body">
+          <div class="fw-semibold">Total Users</div>
+          <div class="display-6 fw-bold"><%= num(s.totalUsers) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Actions -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-info">
+        <div class="card-body">
+          <div class="fw-semibold">Admin Actions</div>
+          <div class="display-6 fw-bold"><%= num(s.adminActions) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Operations Actions -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-success">
+        <div class="card-body">
+          <div class="fw-semibold">Operations Actions</div>
+          <div class="display-6 fw-bold"><%= num(s.operationsActions) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Courier Actions -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-warning">
+        <div class="card-body">
+          <div class="fw-semibold">Courier Actions</div>
+          <div class="display-6 fw-bold"><%= num(s.courierActions) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blockchain Anchored -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-success">
+        <div class="card-body">
+          <div class="fw-semibold">Blockchain Anchored</div>
+          <div class="display-6 fw-bold"><%= num(s.blockchainAnchored) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blockchain Pending -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-warning">
+        <div class="card-body">
+          <div class="fw-semibold">Blockchain Pending</div>
+          <div class="display-6 fw-bold"><%= num(s.blockchainPending) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update Status -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-primary">
+        <div class="card-body">
+          <div class="fw-semibold">Update Status</div>
+          <div class="display-6 fw-bold"><%= num(s.updateStatus) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import Deliveries -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-danger">
+        <div class="card-body">
+          <div class="fw-semibold">Import Deliveries</div>
+          <div class="display-6 fw-bold"><%= num(s.importDeliveries) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Role Updates -->
+    <div class="col-12 col-sm-6 col-lg-3">
+      <div class="card shadow-sm border-0 border-top border-4 border-dark">
+        <div class="card-body">
+          <div class="fw-semibold">Role Updates</div>
+          <div class="display-6 fw-bold"><%= num(s.roleUpdates) %></div>
+          <div class="text-muted small">Records</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+
+  <%
+    const sodWarnings = [];
+    if ((stats?.operationsActions || 0) > 0 && (stats?.roleUpdates || 0) > 0) {
+      sodWarnings.push("Operations role performed ROLE_UPDATE actions (SoD risk).");
+    }
+    if ((stats?.courierActions || 0) > 0 && (stats?.importDeliveries || 0) > 0) {
+      sodWarnings.push("Courier role performed IMPORT_DELIVERIES actions (unexpected behaviour).");
+    }
+  %>
+
+  <% if (sodWarnings.length) { %>
+    <div class="alert alert-danger shadow-sm mb-3">
+      <strong>⚠ Segregation of Duties Alerts</strong>
+      <ul class="mb-0">
+        <% sodWarnings.forEach(w => { %>
+          <li><%= w %></li>
+        <% }) %>
+      </ul>
+    </div>
+  <% } %>
+    </div> <!-- end Summary Cards tab -->
+
+
+  <div class="tab-pane fade" id="pane-graphs" role="tabpanel" aria-labelledby="tab-graphs">
+
+    <button id="exportPdf" class="btn btn-outline-dark" style="background-color: green; color: white;">Export Charts to PDF</button>
+    <p> </p>
+  <!-- ================= AUDIT CHARTS ================= -->
+   
+<div id="auditCharts">
+
+  <div class="row g-3 mb-3">
+
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Actions Over Time</h6>
+          <canvas id="chartActionsOverTime" height="140"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Actions by Type</h6>
+          <canvas id="chartActionsByType"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Actions by Role</h6>
+          <canvas id="chartActionsByRole"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Top Active Users</h6>
+          <canvas id="chartTopUsers"></canvas>
+        </div>
+      </div>
+    </div>
+
+
+    <div class="col-md-6">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h6 class="mb-2">Status Updates vs Exceptions</h6>
+          <canvas id="chartStatusVsExceptions"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+  </div> <!-- end Graphs tab -->
+
+  <!-- ======================================================= -->
+
+  <!-- ================= FILTERS & CONTROLS ================= -->
+     <div class="tab-pane fade" id="pane-logs" role="tabpanel" aria-labelledby="tab-logs">
+
+
   <form class="card border-0 shadow-sm mb-3" method="GET" action="/auditLog">
     <div class="card-body">
       <div class="row g-2 align-items-end">
@@ -128,12 +354,22 @@
       </div>
     </div>
   </form>
-  <button id="exportExcel" class="btn btn-success mb-3">Export to Excel</button>
+
+  <!-- ======================================================= -->
+
+  <!-- ================= Export ================= -->
+
+  <div class="d-flex gap-2 mb-3">
+    <button id="exportExcel" class="btn btn-success">Export to Excel</button>
+  </div>
+
+  <!-- ======================================================= -->
 
   <table class="table table-bordered table-striped table-sm align-middle">
     <thead class="table-dark">
       <tr>
-        <th>Time</th>
+        <th>Action Time (SG)</th>
+        <th>Blockchain Time (SG)</th>
         <th>User</th>
         <th>Action</th>
         <th>Entity</th>
@@ -158,6 +394,11 @@
 
           <!-- MAIN ROW -->
           <tr class="<%= getRowColor(log.action_type) %>">
+            <td>
+              <%= new Date(log.action_timestamp || log.timestamp)
+                .toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) %>
+            </td>
+
             <td>
               <%= log.timestamp ? new Date(log.timestamp).toLocaleString("en-SG", { timeZone: "Asia/Singapore" }) : "-" %>
             </td>
@@ -267,7 +508,7 @@
   <nav class="d-flex justify-content-center mt-3" aria-label="Audit pagination">
     <ul class="pagination pagination-sm">
       <li class="page-item <%= (safePage <= 1 ? 'disabled' : '') %>">
-        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.max(1, safePage - 1) }) %>">Prev</a>
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.max(1, safePage - 1), tab: 'logs' }) %>">Prev</a>
       </li>
 
       <%
@@ -276,23 +517,23 @@
       %>
 
       <% if (start > 1) { %>
-        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: 1 }) %>">1</a></li>
+        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: 1, tab: 'logs' }) %>">1</a></li>
         <% if (start > 2) { %><li class="page-item disabled"><span class="page-link">…</span></li><% } %>
       <% } %>
 
       <% for (let p = start; p <= end; p++) { %>
         <li class="page-item <%= (p === safePage ? 'active' : '') %>">
-          <a class="page-link" href="/auditLog?<%= buildQuery({ page: p }) %>"><%= p %></a>
+          <a class="page-link" href="/auditLog?<%= buildQuery({ page: p, tab: 'logs'}) %>"><%= p %></a>
         </li>
       <% } %>
 
       <% if (end < safeTotalPages) { %>
         <% if (end < safeTotalPages - 1) { %><li class="page-item disabled"><span class="page-link">…</span></li><% } %>
-        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: safeTotalPages }) %>"><%= safeTotalPages %></a></li>
+        <li class="page-item"><a class="page-link" href="/auditLog?<%= buildQuery({ page: safeTotalPages, tab: 'logs' }) %>"><%= safeTotalPages %></a></li>
       <% } %>
 
       <li class="page-item <%= (safePage >= safeTotalPages ? 'disabled' : '') %>">
-        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.min(safeTotalPages, safePage + 1) }) %>">Next</a>
+        <a class="page-link" href="/auditLog?<%= buildQuery({ page: Math.min(safeTotalPages, safePage + 1), tab: 'logs' }) %>">Next</a>
       </li>
     </ul>
   </nav>
@@ -304,12 +545,207 @@
       <p class="mb-0 text-sm">&copy; Placeholder TXT</p>
     </div>
   </footer>
+  </div> <!-- end Audit Logs tab -->
+</div> <!-- end tab-content -->
 
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
   
   <script>
+    const CHART = JSON.parse('<%- JSON.stringify(chartData || {}) %>');
+
+      // ================= KEEP ACTIVE TAB ON RELOAD =================
+  function setUrlTab(tabName) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tabName);
+    window.history.replaceState({}, "", url);
+  }
+
+  function getUrlTab() {
+    return new URL(window.location.href).searchParams.get("tab");
+  }
+
+  // Update URL when switching tabs
+  document.getElementById("tab-cards")?.addEventListener("shown.bs.tab", () => setUrlTab("cards"));
+  document.getElementById("tab-graphs")?.addEventListener("shown.bs.tab", () => setUrlTab("graphs"));
+  document.getElementById("tab-logs")?.addEventListener("shown.bs.tab", () => setUrlTab("logs"));
+
+  // Restore tab on page load (pagination reload)
+  document.addEventListener("DOMContentLoaded", () => {
+    const tab = getUrlTab();
+    if (!tab) return;
+
+    const map = { cards: "tab-cards", graphs: "tab-graphs", logs: "tab-logs" };
+    const btn = document.getElementById(map[tab]);
+    if (btn) new bootstrap.Tab(btn).show();
+  });
+
+
+    const RED = "rgba(255,99,132,0.9)";
+    const palette = [
+      "rgba(54,162,235,0.75)",
+      "rgba(75,192,192,0.75)",
+      "rgba(255,159,64,0.75)",
+      "rgba(153,102,255,0.75)",
+      "rgba(255,205,86,0.75)",
+      "rgba(201,203,207,0.75)",
+      "rgba(99,255,132,0.75)",
+      "rgba(235,54,162,0.75)",
+    ];
+
+    function colorsForLabels(labels, forceRedSet = new Set()) {
+      return (labels || []).map((lab, i) => {
+        const key = String(lab);
+        if (forceRedSet.has(key)) return RED;
+        return palette[i % palette.length];
+      });
+    }
+
+    function goFilter(params) {
+      const url = new URL(window.location.href);
+      Object.entries(params).forEach(([k, v]) => {
+        if (v === null || v === undefined || v === "") url.searchParams.delete(k);
+        else url.searchParams.set(k, String(v));
+      });
+      url.searchParams.set("page", "1");
+      window.location.href = url.toString();
+    }
+
+    function makeBar(id, labels, data, forceRedSet, onClick) {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const bg = colorsForLabels(labels, forceRedSet);
+
+      return new Chart(el, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [{
+            label: "Count",
+            data,
+            backgroundColor: bg,
+            borderColor: bg
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+          onClick
+        }
+      });
+    }
+
+    // ✅ 1) Actions Over Time (Line) — ensure it shows
+    (() => {
+      const el = document.getElementById("chartActionsOverTime");
+      if (!el) return;
+
+      const d = CHART.actionsOverTime || { labels: [], total: [], importDeliveries: [], updateStatus: [] };
+
+      new Chart(el, {
+        type: "line",
+        data: {
+          labels: d.labels || [],
+          datasets: [
+            {
+              label: "Total",
+              data: d.total || [],
+              borderColor: "rgba(54,162,235,0.9)",
+              backgroundColor: "rgba(54,162,235,0.25)",
+              fill: false,
+              tension: 0.35
+            },
+            {
+              label: "IMPORT_DELIVERIES",
+              data: d.importDeliveries || [],
+              borderColor: "rgba(255,159,64,0.9)",
+              backgroundColor: "rgba(255,159,64,0.25)",
+              fill: false,
+              tension: 0.35
+            },
+            {
+              label: "UPDATE_STATUS",
+              data: d.updateStatus || [],
+              borderColor: "rgba(75,192,192,0.9)",
+              backgroundColor: "rgba(75,192,192,0.25)",
+              fill: false,
+              tension: 0.35
+            },
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: "top" } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    })();
+
+    // ✅ 2) Actions by Type — each bar different, sensitive reveal RED, clickable
+    makeBar(
+      "chartActionsByType",
+      (CHART.actionsByType?.labels || []),
+      (CHART.actionsByType?.counts || []),
+      new Set(["SENSITIVE_REVEAL_GRANTED", "SENSITIVE_REVEAL", "SENSITIVE_REVEAL_GRANTED", "REVEAL", "REVEAL_SENSITIVE"]),
+      (evt, elements, chart) => {
+        if (!elements.length) return;
+        const action = chart.data.labels[elements[0].index];
+        goFilter({ action });
+      }
+    );
+
+    // ✅ 3) Actions by Role — each bar different, unknown RED (your backend makes order stable)
+    makeBar(
+      "chartActionsByRole",
+      (CHART.actionsByRole?.labels || []),
+      (CHART.actionsByRole?.counts || []),
+      new Set(["unknown"]),
+      null
+    );
+
+    // ✅ 4) Top Users — each bar different, clickable (filters search q)
+    makeBar(
+      "chartTopUsers",
+      (CHART.topUsers?.labels || []),
+      (CHART.topUsers?.counts || []),
+      new Set([]),
+      (evt, elements, chart) => {
+        if (!elements.length) return;
+        const username = chart.data.labels[elements[0].index];
+        goFilter({ q: username });
+      }
+    );
+
+    // ✅ 5) Login vs Failed Login — failed RED, clickable
+    makeBar(
+      "chartLoginVsFailed",
+      (CHART.loginVsFailed?.labels || ["LOGIN", "FAILED_LOGIN"]),
+      (CHART.loginVsFailed?.counts || [0, 0]),
+      new Set(["FAILED_LOGIN"]),
+      (evt, elements, chart) => {
+        if (!elements.length) return;
+        const a = chart.data.labels[elements[0].index];
+        goFilter({ action: a });
+      }
+    );
+
+    // ✅ 6) Status Updates vs Exceptions — failed deliveries RED, should show
+    makeBar(
+      "chartStatusVsExceptions",
+      (CHART.statusVsExceptions?.labels || ["UPDATE_STATUS", "FAILED_DELIVERIES"]),
+      (CHART.statusVsExceptions?.counts || [0, 0]),
+      new Set(["FAILED_DELIVERIES"]),
+      null
+    );
+
+
     // =========================
     // 1) IMPORT COLLAPSE TOGGLE
     // =========================
@@ -410,6 +846,69 @@
       });
     });
 
+    // =========================
+    // 2) PDF EXPORT (CHARTS ONLY)
+    // =========================
+    document.getElementById("exportPdf")?.addEventListener("click", async () => {
+      try {
+        console.log("[PDF] clicked");
+
+        if (!window.html2canvas) {
+          alert("html2canvas not loaded. Check the script include.");
+          return;
+        }
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+          alert("jsPDF not loaded. Check the script include.");
+          return;
+        }
+
+        const chartsEl = document.getElementById("auditCharts");
+        if (!chartsEl) {
+          alert("Cannot find #auditCharts. Your charts must be inside <div id='auditCharts'>...</div>.");
+          return;
+        }
+
+        // Render charts section to canvas
+        const canvas = await html2canvas(chartsEl, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: -window.scrollY,
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const { jsPDF } = window.jspdf;
+
+        // A4 portrait
+        const pdf = new jsPDF("p", "mm", "a4");
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+
+        // Fit image to page width
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        // Multi-page support
+        let position = 0;
+        let heightLeft = imgHeight;
+
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+
+        while (heightLeft > 0) {
+          pdf.addPage();
+          position = heightLeft - imgHeight; // shift up on next page
+          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+          heightLeft -= pageHeight;
+        }
+
+        pdf.save("audit_charts.pdf");
+      } catch (err) {
+        console.error("[PDF][ERROR]", err);
+        alert("Export failed: " + (err?.message || err));
+      }
+    });
     // =========================
     // 2) EXCEL EXPORT
     // =========================
