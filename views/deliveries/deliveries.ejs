@@ -6,9 +6,9 @@
 </head>
 
 <body class="p-4">
-  <%- include("partials/navbar") %>
+  <%- include("../partials/navbar") %>
   <div class="sidebar-hover-zone"></div>
-  <%- include("partials/sidebar") %>
+  <%- include("../partials/sidebar") %>
   <br>
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Unprocessed Card</h1>
@@ -43,8 +43,8 @@
           </div>
 
           <div class="col-md-3 d-flex align-items-end">
-            <a href="/wip" class="btn btn-outline-secondary w-100">
-              Download Template
+            <a href="/deliveries/export<%= batchId ? '?batchId=' + encodeURIComponent(batchId) : '' %>" class="btn btn-outline-secondary w-100">
+              Download Data
             </a>
           </div>
         </div>
@@ -193,7 +193,7 @@
 
   <% } %>
 
-  <%- include('partials/footer') %>
+  <%- include('../partials/footer') %>
 
 <script>
 (() => {
