@@ -71,14 +71,19 @@
             <label class="form-label">Status</label>
             <select id="statusFilter" class="form-select">
               <option value="">All</option>
-              <option>Pending</option>
-              <option>Pulled Out</option>
-              <option>Not Found</option>
-              <option>Handed to Courier</option>
               <option>Delivered</option>
-              <option>Returned to Printer</option>
-              <option>Destroyed</option>
-              <option>Reprocessing</option>
+              <option>Bad Address</option>
+              <option>Consignee No</option>
+              <option>Denied Entry</option>
+              <option>Flooded Area</option>
+              <option>Office Close</option>
+              <option>Relocated</option>
+              <option>Refuse to Accept</option>
+              <option>Transfer</option>
+              <option>Unlocated</option>
+              <option>Return to Centre</option>
+              <option>Return to Sender</option>
+              <option>No Updates</option>
             </select>
           </div>
 
@@ -148,14 +153,19 @@
               <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1">
                 <input type="hidden" name="batchId" value="<%= batchId || '' %>">
                 <select name="status" class="form-select form-select-sm">
-                  <option value="Pending"             <%= d.status === 'Pending' ? 'selected' : '' %>>Pending</option>
-                  <option value="Pulled Out"          <%= d.status === 'Pulled Out' ? 'selected' : '' %>>Pulled Out</option>
-                  <option value="Not Found"           <%= d.status === 'Not Found' ? 'selected' : '' %>>Not Found</option>
-                  <option value="Handed to Courier"   <%= d.status === 'Handed to Courier' ? 'selected' : '' %>>Handed to Courier</option>
                   <option value="Delivered"           <%= d.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
-                  <option value="Returned to Printer" <%= d.status === 'Returned to Printer' ? 'selected' : '' %>>Returned to Printer</option>
-                  <option value="Destroyed"           <%= d.status === 'Destroyed' ? 'selected' : '' %>>Destroyed</option>
-                  <option value="Reprocessing"        <%= d.status === 'Reprocessing' ? 'selected' : '' %>>Reprocessing</option>
+                  <option value="Bad Address"         <%= d.status === 'Bad Address' ? 'selected' : '' %>>Bad Address</option>
+                  <option value="Consignee No"        <%= d.status === 'Consignee No' ? 'selected' : '' %>>Consignee No</option>
+                  <option value="Denied Entry"        <%= d.status === 'Denied Entry' ? 'selected' : '' %>>Denied Entry</option>
+                  <option value="Flooded Area"        <%= d.status === 'Flooded Area' ? 'selected' : '' %>>Flooded Area</option>
+                  <option value="Office Close"        <%= d.status === 'Office Close' ? 'selected' : '' %>>Office Close</option>
+                  <option value="Relocated"           <%= d.status === 'Relocated' ? 'selected' : '' %>>Relocated</option>
+                  <option value="Refuse to Accept"    <%= d.status === 'Refuse to Accept' ? 'selected' : '' %>>Refuse to Accept</option>
+                  <option value="Transfer"            <%= d.status === 'Transfer' ? 'selected' : '' %>>Transfer</option>
+                  <option value="Unlocated"           <%= d.status === 'Unlocated' ? 'selected' : '' %>>Unlocated</option>
+                  <option value="Return to Centre"    <%= d.status === 'Return to Centre' ? 'selected' : '' %>>Return to Centre</option>
+                  <option value="Return to Sender"    <%= d.status === 'Return to Sender' ? 'selected' : '' %>>Return to Sender</option>
+                  <option value="No Updates"          <%= d.status === 'No Updates' ? 'selected' : '' %>>No Updates</option>
                 </select>
 
                 <button type="submit" class="btn btn-sm btn-primary">Save</button>

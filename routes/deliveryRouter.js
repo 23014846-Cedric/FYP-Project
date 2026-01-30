@@ -42,7 +42,7 @@ const deliveryValidationRules = [
     .withMessage("Recipient name too long"),
   body("address").trim().notEmpty().withMessage("Address is required"),
   body("courier").optional({ checkFalsy: true }).isLength({ max: 50 }).withMessage("Courier name too long"),
-  body("status").optional().isIn(["Pending", "Shipped", "Delivered", "Failed"]).withMessage("Invalid status value"),
+  body("status").optional().isIn(["Delivered","Bad Address","Consignee No","Denied Entry","Flooded Area","Office Close","Relocated","Refuse to Accept","Transfer","Unlocated","Return to Centre","Return to Sender","No Updates"]).withMessage("Invalid status value"),
 ];
 
 function toUpperTrim(v) {
@@ -408,15 +408,10 @@ router.post("/:id/status", async (req, res) => {
     const batchId = req.body.batchId;
 
     const allowedStatuses = [
-      "Pending",
-      "Pulled Out",
-      "Not Found",
-      "Handed to Courier",
-      "Delivered",
-      "Returned to Printer",
-      "Destroyed",
-      "Reprocessing",
-      "Failed",
+      "Delivered","Bad Address","Consignee No","Denied Entry",
+      "Flooded Area","Office Close","Relocated","Refuse to Accept",
+      "Transfer","Unlocated","Return to Centre","Return to Sender",
+      "No Updates"
     ];
     if (!allowedStatuses.includes(new_status)) return res.status(400).send("Invalid status");
 

@@ -2,9 +2,10 @@
 const mongoose = require("mongoose");
 
 const STATUS = [
-  "Pending","Pulled Out","Not Found","Handed to Courier",
-  "Delivered","Returned to Printer","Destroyed","Reprocessing",
-  "Failed"
+  "Delivered","Bad Address","Consignee No","Denied Entry",
+  "Flooded Area","Office Close","Relocated","Refuse to Accept",
+  "Transfer","Unlocated","Return to Centre","Return to Sender",
+  "No Updates"
 ];
 
 const cardDeliverySchema = new mongoose.Schema(
