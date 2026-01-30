@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Card Delivery – Deliveries</title>
+  <title>Card Delivery – RTS Unprocess</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
 
 <body class="p-4">
-  <%- include("partials/navbar") %>
+  <%- include("../partials/navbar") %>
   <div class="sidebar-hover-zone"></div>
-  <%- include("partials/sidebar") %>
+  <%- include("../partials/sidebar") %>
   <br>
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Unprocessed Card</h1>
+    <h1>RTS Unprocess Report</h1>
 
     <!-- Optional: Clear current session import -->
-    <form method="POST" action="/deliveries/clear-session" class="m-0">
+    <form method="POST" action="/deliveries/rts/clear-session" class="m-0">
       <button class="btn btn-outline-danger btn-sm" type="submit">
         Clear Session
       </button>
@@ -25,14 +25,14 @@
   <!-- Excel Import Card -->
   <div class="card mb-4">
     <div class="card-header fw-bold">
-      Import Deliveries via Excel (.xlsx / .csv)
+      Import RTS Unprocess Report (.xlsx / .csv)
     </div>
 
     <div class="card-body">
-      <form action="/deliveries/import" method="POST" enctype="multipart/form-data" id="importForm" onsubmit="return confirmImport(event)">
+      <form action="/deliveries/rts/import" method="POST" enctype="multipart/form-data" id="importForm" onsubmit="return confirmImport(event)">
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label">Upload Excel File</label>
+            <label class="form-label">Upload RTS Excel File</label>
             <input type="file" name="excel_file" accept=".xlsx, .xls, .csv" class="form-control" required id="excelFileInput">
           </div>
 
@@ -43,8 +43,8 @@
           </div>
 
           <div class="col-md-3 d-flex align-items-end">
-            <a href="/wip" class="btn btn-outline-secondary w-100">
-              Download Template
+            <a href="/deliveries/rts/export<%= batchId ? '?batchId=' + encodeURIComponent(batchId) : '' %>" class="btn btn-outline-secondary w-100">
+              Download Data
             </a>
           </div>
         </div>
@@ -64,14 +64,13 @@
 
           <div class="col-md-4">
             <label class="form-label">Search</label>
-            <input id="searchInput" class="form-control" placeholder="Search card, recipient, address, courier">
+            <input id="searchInput" class="form-control" placeholder="Search AWB, recipient, address, courier">
           </div>
 
           <div class="col-md-3">
             <label class="form-label">Status</label>
             <select id="statusFilter" class="form-select">
               <option value="">All</option>
-              <option>Delivered</option>
               <option>Bad Address</option>
               <option>Consignee Not Around</option>
               <option>Denied Entry/Access</option>
@@ -81,9 +80,6 @@
               <option>Refuse to Accept</option>
               <option>Transfer</option>
               <option>Unlocated</option>
-              <option>Return to Centre</option>
-              <option>Return to Sender</option>
-              <option>No Updates</option>
             </select>
           </div>
 
@@ -108,52 +104,59 @@
   <!-- If no deliveries (no import in this session yet) -->
   <% if (!deliveries || deliveries.length === 0) { %>
     <div class="alert alert-warning">
-      No deliveries to show yet for this session. Please import an Excel file.
+      No RTS deliveries to show yet for this session. Please import an RTS Excel file.
     </div>
   <% } else { %>
 
     <!-- Deliveries Table -->
-    <table class="table table-bordered table-striped align-middle">
+    <table class="table table-bordered table-striped align-middle table-sm">
       <thead class="table-dark">
         <tr>
-          <th>ID</th>
-          <th>Card / Ref #</th>
-          <th>Recipient</th>
+          <th>Shipper Name</th>
+          <th>Pickup Date</th>
+          <th>Code</th>
+          <th>RTS AWB</th>
+          <th>Consignee Name</th>
           <th>Address</th>
-          <th>Courier</th>
+          <th>Consignee ZIP</th>
+          <th>Dest Port</th>
+          <th>Date Received</th>
+          <th>Reason</th>
+          <th>Remarks</th>
+          <th>Contact No</th>
+          <th>Reference</th>
           <th>Status</th>
-          <th>Updated At</th>
-          <th>Update Status</th>
+          <th>Action</th>
         </tr>
       </thead>
 
       <tbody>
         <% deliveries.forEach(d => { %>
           <tr>
-            <td><%= d.id %></td>
-            <td><%= d.card_number %></td>
-            <td><%= d.recipient_name %></td>
-            <td><%= d.address %></td>
-            <td><%= d.courier || '-' %></td>
+            <td><%= d.ship_name || 'nil' %></td>
+            <td><%= d.pickup_date || 'nil' %></td>
+            <td><%= d.code || 'nil' %></td>
+            <td><%= d.rts_awb || 'nil' %></td>
+            <td><%= d.cnee_name || 'nil' %></td>
+            <td><%= d.cnee_street || 'nil' %></td>
+            <td><%= d.cnee_zip || 'nil' %></td>
+            <td><%= d.dest_port || 'nil' %></td>
+            <td><%= d.date_received || 'nil' %></td>
+            <td><%= d.reason || 'nil' %></td>
+            <td><%= d.remarks || 'nil' %></td>
+            <td><%= d.cnee_contact_no || 'nil' %></td>
+            <td><%= d.reference || 'nil' %></td>
 
             <td>
-              <span class="badge bg-info">
+              <span class="badge bg-warning text-dark">
                 <%= d.status %>
               </span>
-            </td>
-
-            <td>
-              <% 
-                const dt = d.updated_at ? new Date(d.updated_at) : null;
-              %>
-              <%= dt ? dt.toISOString().slice(0,19).replace('T',' ') : '-' %>
             </td>
 
             <td>
               <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1">
                 <input type="hidden" name="batchId" value="<%= batchId || '' %>">
                 <select name="status" class="form-select form-select-sm">
-                  <option value="Delivered"           <%= d.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
                   <option value="Bad Address"         <%= d.status === 'Bad Address' ? 'selected' : '' %>>Bad Address</option>
                   <option value="Consignee Not Around" <%= d.status === 'Consignee Not Around' ? 'selected' : '' %>>Consignee Not Around</option>
                   <option value="Denied Entry/Access"  <%= d.status === 'Denied Entry/Access' ? 'selected' : '' %>>Denied Entry/Access</option>
@@ -163,9 +166,6 @@
                   <option value="Refuse to Accept"    <%= d.status === 'Refuse to Accept' ? 'selected' : '' %>>Refuse to Accept</option>
                   <option value="Transfer"            <%= d.status === 'Transfer' ? 'selected' : '' %>>Transfer</option>
                   <option value="Unlocated"           <%= d.status === 'Unlocated' ? 'selected' : '' %>>Unlocated</option>
-                  <option value="Return to Centre"    <%= d.status === 'Return to Centre' ? 'selected' : '' %>>Return to Centre</option>
-                  <option value="Return to Sender"    <%= d.status === 'Return to Sender' ? 'selected' : '' %>>Return to Sender</option>
-                  <option value="No Updates"          <%= d.status === 'No Updates' ? 'selected' : '' %>>No Updates</option>
                 </select>
 
                 <button type="submit" class="btn btn-sm btn-primary">Save</button>
@@ -193,7 +193,7 @@
 
   <% } %>
 
-  <%- include('partials/footer') %>
+  <%- include('../partials/footer') %>
 
 <script>
 (() => {
@@ -240,7 +240,7 @@
     filtered.slice(start, end).forEach(r => (r.style.display = ""));
 
     pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-    deliveryCount.textContent = `Showing ${filtered.length} deliveries`;
+    deliveryCount.textContent = `Showing ${filtered.length} RTS deliveries`;
 
     prevBtn.disabled = currentPage === 1;
     nextBtn.disabled = currentPage === totalPages;
@@ -259,15 +259,15 @@
   render();
 })();
 
-// ✅ Confirmation dialog for Excel import
+// Confirmation dialog for Excel import
 function confirmImport(event) {
   const fileInput = document.getElementById('excelFileInput');
   const fileName = fileInput.files[0]?.name || 'No file selected';
   
   const confirmed = confirm(
-    `Are you sure you want to import the file: "${fileName}"?\n\n` +
+    `Are you sure you want to import the RTS file: "${fileName}"?\n\n` +
     `This will:\n` +
-    `• Add new delivery records\n` +
+    `• Add new RTS delivery records\n` +
     `• Update status for existing records if changed\n` +
     `• Skip duplicate records with no changes\n\n` +
     `Click OK to proceed or Cancel to abort.`

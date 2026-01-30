@@ -12,7 +12,7 @@
 
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Delivery Exceptions</h1>
-    <p class="text-muted">This page shows all deliveries that were marked as Failed.</p>
+    <p class="text-muted">This page shows all deliveries that were undelivered.</p>
   </div>
 
   <!-- Exceptions Table -->
@@ -102,14 +102,18 @@
             <div class="mb-3">
                 <label class="form-label">Status</label>
                 <select class="form-select" name="status" id="statusInput"><option>Pending</option>
-                  <option>Pulled Out</option>
-                  <option>Not Found</option>
-                  <option>Handed to Courier</option>
-                  <option>Delivered</option>
-                  <option>Returned to Printer</option>
-                  <option>Destroyed</option>
-                  <option>Reprocessing</option>
-                  <option>Failed</option>
+                  <option>Bad Address</option>
+                  <option>Consignee Not Around</option>
+                  <option>Denied Entry/Access</option>
+                  <option>Flooded Area</option>
+                  <option>Office Close</option>
+                  <option>Relocated</option>
+                  <option>Refuse to Accept</option>
+                  <option>Transfer</option>
+                  <option>Unlocated</option>
+                  <option>Return to Centre</option>
+                  <option>Return to Sender</option>
+                  <option>No Updates</option>
                 </select>
             </div>
 

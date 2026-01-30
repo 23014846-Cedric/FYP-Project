@@ -647,6 +647,21 @@ app.post('/wip', async (req, res) => {
   });
 });
 
+// Dispatch List + Progressive Report (admin / operations / courier only)
+app.use(
+  "/deliveries/dispatchlist",
+  authMiddleware,
+  requireRole(["admin", "operations", "courier"]),
+  deliveryRouter
+);
+
+app.use(
+  "/deliveries/progressivereports",
+  authMiddleware,
+  requireRole(["admin", "operations", "courier"]),
+  deliveryRouter
+);
+
 // Exceptions – Admin + Operations
 app.use(
   '/exceptions',

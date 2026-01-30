@@ -2,9 +2,10 @@
 const mongoose = require("mongoose");
 
 const STATUS = [
-  "Pending","Pulled Out","Not Found","Handed to Courier",
-  "Delivered","Returned to Printer","Destroyed","Reprocessing",
-  "Failed"
+  "Delivered","Bad Address","Consignee Not Around","Denied Entry/Access",
+  "Flooded Area","Office Close","Relocated","Refuse to Accept",
+  "Transfer","Unlocated","Return to Centre","Return to Sender",
+  "No Updates"
 ];
 
 const cardDeliverySchema = new mongoose.Schema(
@@ -21,6 +22,23 @@ const cardDeliverySchema = new mongoose.Schema(
     import_batch_id: { type: String, index: true },
     imported_by: { type: String }, // user id/email/name
     imported_at: { type: Date },
+
+    // RTS-specific fields
+    ship_name: { type: String, trim: true },
+    pickup_date: { type: String, trim: true },
+    code: { type: String, trim: true },
+    rts_awb: { type: String, trim: true },
+    cnee_zip: { type: String, trim: true },
+    dest_port: { type: String, trim: true },
+    cnee_name: { type: String, trim: true },
+    cnee_street: { type: String, trim: true },
+    date_received: { type: String, trim: true },
+    reason: { type: String, trim: true },
+    remarks: { type: String, trim: true },
+    cnee_contact_no: { type: String, trim: true },
+    reference: { type: String, trim: true },
+    attachment: { type: String, trim: true },
+    new_attachment: { type: String, trim: true },
   },
   {
     timestamps: { createdAt: "created_at", updatedAt: false },
