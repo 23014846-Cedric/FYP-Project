@@ -30,6 +30,8 @@ const revealRouter = require("./routes/revealRouter");
 const auditApiRouter = require("./routes/auditApiRouter");
 const importBatchApiRouter = require("./routes/importBatchApiRouter");
 const courierRouter = require("./routes/courierRouter");
+const dispatchListRouter = require("./routes/dispatchList");
+const progressiveReportRouter = require("./routes/progressiveReport");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -646,6 +648,21 @@ app.post('/wip', async (req, res) => {
     message: "This feature is still under development."
   });
 });
+
+// Dispatch List + Progressive Report (admin / operations / courier only)
+app.use(
+  "/deliveries/dispatchlist",
+  authMiddleware,
+  requireRole(["admin", "operations", "courier"]),
+  dispatchListRouter
+);
+
+app.use(
+  "/deliveries/progressivereports",
+  authMiddleware,
+  requireRole(["admin", "operations", "courier"]),
+  progressiveReportRouter
+);
 
 // Exceptions – Admin + Operations
 app.use(
