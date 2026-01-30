@@ -1,136 +1,209 @@
 <div class="sidebar">
-    <style>
-       .sidebar {
-            position: fixed;
-            top: 0;
-            left: -200px; 
-            width: 200px;
-            height: 100vh;
-            background: rgba(255, 255, 255, 1);
-            border-right: 1px solid rgba(255,255,255,0.1);
-            transition: left 0.3s ease;
-            overflow: hidden;
-            z-index: 9999;
-            padding-top: 70px;
-        }
+  <style>
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: -200px;
+      width: 200px;
+      height: 100vh;
+      background: rgba(255, 255, 255, 1);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      transition: left 0.3s ease;
+      overflow: hidden;
+      z-index: 9999;
+      padding-top: 70px;
+    }
 
-        .sidebar-hover-zone {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 20px;
-            height: 100vh;
-            z-index: 9998;
-        }
+    .sidebar-hover-zone {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 20px;
+      height: 100vh;
+      z-index: 9998;
+    }
 
-        .sidebar-hover-zone:hover + .sidebar,
-        .sidebar:hover {
-            left: 0;
-        }
+    .sidebar-hover-zone:hover + .sidebar,
+    .sidebar:hover {
+      left: 0;
+    }
 
-        .sidebar ul {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-        }
+    .sidebar ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
 
-        .sidebar ul li a {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 18px;
-            color: #111827; /* darker so it shows on white */
-            text-decoration: none;
-            white-space: nowrap;
-        }
+    .sidebar ul li a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 18px;
+      color: #111827;
+      text-decoration: none;
+      white-space: nowrap;
+    }
 
-        .sidebar ul li a:hover {
-            background: rgba(0,0,0,0.04);
-        }
+    .sidebar ul li a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
 
-        .sidebar-icon {
-            width: 20px;
-            opacity: 0.85;
-        }
-          .hidden {
-            display: none !important;
-        }   
-    </style>
+    .sidebar-icon {
+      width: 20px;
+      opacity: 0.85;
+    }
 
-        <ul>
-            <% if (user && user.role === "admin") { %>
-                <!-- ADMIN MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/admin/profile">Admin Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/exceptions">Exceptions</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/deliveries">Import Deliveries</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/deliveries/rts">Return to Sender</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/auditLog">Audit Trail</a>
-                </li>
-                <!-- Function just to demonstrate blockchain audit logging works -->
-                <li class="hidden">
-                    <a class="nav-link" href="/auditDemo">Audit Hash</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>
-            <% } else if (user && user.role === "printer") { %>
-                <!-- PRINTER MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/printer/returns">Returned Cards</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>
-            <% } else if (user && user.role === "operations") { %>
-                <!-- NORMAL LOGGED-IN USER MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/exceptions">Exceptions</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/deliveries">Deliveries</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/messages">Messages</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>      
-            <% } else if (user && user.role === "courier") { %>
-                <!-- NORMAL LOGGED-IN USER MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/courier/deliveries">My Deliveries</a>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>            
-            <% }  else { %>
-                <!-- GUEST MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/login">Login</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-primary fw-bold" href="/signup">Register</a>
-                </li>
-            <% } %> 
+    .hidden {
+      display: none !important;
+    }
+
+    /* ===== Dropdown styles (no bootstrap JS needed) ===== */
+    .nav-item.dropdown .dropdown-menu-sidebar {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease;
+    }
+
+    .nav-item.dropdown.open .dropdown-menu-sidebar {
+      max-height: 240px;
+    }
+
+    .nav-item.dropdown .sub-link {
+      padding-left: 38px;
+      font-size: 0.95rem;
+    }
+
+    .nav-item.dropdown .chev {
+      margin-left: auto;
+      transition: transform 0.2s ease;
+      opacity: 0.75;
+    }
+
+    .nav-item.dropdown.open .chev {
+      transform: rotate(90deg);
+    }
+  </style>
+
+  <ul>
+    <% if (user && user.role === "admin") { %>
+      <!-- ADMIN MENU -->
+      <li class="nav-item">
+        <a class="nav-link" href="/profile">Profile</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="/admin/profile">Admin Profile</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="/exceptions">Exceptions</a>
+      </li>
+
+      <!-- ✅ Deliveries dropdown -->
+      <li class="nav-item dropdown" id="deliveriesDropdownItem">
+        <a class="nav-link dropdown-toggle" href="#" id="deliveriesDropdown" role="button" aria-expanded="false">
+          Deliveries
+        </a>
+
+        <ul class="dropdown-menu-sidebar" aria-labelledby="deliveriesDropdown">
+          <li><a class="nav-link sub-link" href="/deliveries">Import Deliveries</a></li>
+          <li><a class="nav-link sub-link" href="/deliveries/rts">Return to Sender</a></li>
+          <li><a class="nav-link sub-link" href="/deliveries/dispatchlist">Dispatch List</a></li>
+          <li><a class="nav-link sub-link" href="/deliveries/progressivereports">Progressive Reports</a></li>
         </ul>
+      </li>
 
-        </ul>
-    </div>
+      <li class="nav-item">
+        <a class="nav-link" href="/auditLog">Audit Trail</a>
+      </li>
 
+      <!-- Function just to demonstrate blockchain audit logging works -->
+      <li class="hidden">
+        <a class="nav-link" href="/auditDemo">Audit Hash</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+      </li>
+
+    <% } else if (user && user.role === "printer") { %>
+      <!-- PRINTER MENU -->
+      <li class="nav-item">
+        <a class="nav-link" href="/printer/returns">Returned Cards</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+      </li>
+
+    <% } else if (user && user.role === "operations") { %>
+      <!-- OPERATIONS MENU -->
+      <li class="nav-item">
+        <a class="nav-link" href="/profile">Profile</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="/exceptions">Exceptions</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="/deliveries">Deliveries</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="/messages">Messages</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+      </li>
+
+    <% } else if (user && user.role === "courier") { %>
+      <!-- COURIER MENU -->
+      <li class="nav-item">
+        <a class="nav-link" href="/profile">Profile</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="/courier/deliveries">My Deliveries</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
+      </li>
+
+    <% } else { %>
+      <!-- GUEST MENU -->
+      <li class="nav-item">
+        <a class="nav-link" href="/login">Login</a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link text-primary fw-bold" href="/signup">Register</a>
+      </li>
+    <% } %>
+  </ul>
+</div>
+
+<script>
+(() => {
+  const toggle = document.getElementById("deliveriesDropdown");
+  const item = document.getElementById("deliveriesDropdownItem");
+  if (!toggle || !item) return;
+
+  // Auto-open if inside /deliveries
+  if (window.location.pathname.startsWith("/deliveries")) {
+    item.classList.add("open");
+    toggle.setAttribute("aria-expanded", "true");
+  }
+
+  toggle.addEventListener("click", (e) => {
+    e.preventDefault();
+    const isOpen = item.classList.toggle("open");
+    toggle.setAttribute("aria-expanded", String(isOpen));
+  });
+})();
+</script>
