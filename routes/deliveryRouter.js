@@ -42,7 +42,7 @@ const deliveryValidationRules = [
     .withMessage("Recipient name too long"),
   body("address").trim().notEmpty().withMessage("Address is required"),
   body("courier").optional({ checkFalsy: true }).isLength({ max: 50 }).withMessage("Courier name too long"),
-  body("status").optional().isIn(["Delivered","Bad Address","Consignee No","Denied Entry","Flooded Area","Office Close","Relocated","Refuse to Accept","Transfer","Unlocated","Return to Centre","Return to Sender","No Updates"]).withMessage("Invalid status value"),
+  body("status").optional().isIn(["Delivered","Bad Address","Consignee Not Around","Denied Entry/Access","Flooded Area","Office Close","Relocated","Refuse to Accept","Transfer","Unlocated","Return to Centre","Return to Sender","No Updates"]).withMessage("Invalid status value"),
 ];
 
 function toUpperTrim(v) {
@@ -211,7 +211,7 @@ router.get("/", async (req, res) => {
 
     deliveries = deliveries.map((d) => ({ ...d, id: d._id.toString() }));
 
-    return res.render("deliveries", {
+    return res.render("deliveries/deliveries", {
       deliveries,
       batchId,
       selectedStatus: status,
@@ -360,7 +360,7 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
         imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
         imported_at: new Date(),
 
-        // ✅ Option A assignment
+        // Option A assignment
         assigned_printer: assignedPrinterId, // ObjectId string or null
       });
     }
@@ -382,7 +382,7 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       entity_id: "BULK",
       source: "Deliveries Import",
       remarks: `Imported ${result.length} new deliveries. Skipped ${invalidCount} invalid rows, ${duplicateCount} duplicates, and updated ${updatedCount} existing entries with status changes.`,
-      import_batch_id: batchId, // ✅ needed for auditLog expand “View”
+      import_batch_id: batchId, // needed for auditLog expand “View”
     });
 
     return res.redirect(`/deliveries?batchId=${encodeURIComponent(batchId)}`);
@@ -399,7 +399,7 @@ router.post("/clear-session", (req, res) => {
 });
 
 // ==========================
-// POST /deliveries/:id/status
+// POST /deliveries/deliveries:id/status
 // ==========================
 router.post("/:id/status", async (req, res) => {
   try {
@@ -408,7 +408,7 @@ router.post("/:id/status", async (req, res) => {
     const batchId = req.body.batchId;
 
     const allowedStatuses = [
-      "Delivered","Bad Address","Consignee No","Denied Entry",
+      "Delivered","Bad Address","Consignee Not Around","Denied Entry/Access",
       "Flooded Area","Office Close","Relocated","Refuse to Accept",
       "Transfer","Unlocated","Return to Centre","Return to Sender",
       "No Updates"
@@ -440,6 +440,414 @@ router.post("/:id/status", async (req, res) => {
 
 router.post("/wip", async (req, res) => {
   return res.status(403).render("wip");
+});
+
+// RTS (Return to Sender) Routes
+const RTS_REASON_MAP = {
+  BAD: "Bad Address",
+  CNA: "Consignee Not Around",
+  DEN: "Denied Entry/Access",
+  FLD: "Flooded Area",
+  OFC: "Office Close",
+  RCL: "Relocated",
+  RTA: "Refuse to Accept",
+  TRF: "Transfer",
+  UCN: "Unlocated",
+};
+
+function mapRTSReasonToStatus(reason) {
+  const normalized = toUpperTrim(reason);
+  if (!normalized) return "";
+  return RTS_REASON_MAP[normalized] || String(reason).trim();
+}
+
+/** Parse RTS Unprocess Report Excel format */
+function parseRTSReportRows(sheet) {
+  const matrix = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  
+  let headerRowIndex = -1;
+  
+  // Look for RTS header with CODE, RTS AWB, CNEE_NAME, CNEE_STREET, REASON columns
+  for (let i = 0; i < matrix.length; i++) {
+    const row = matrix[i].map(toUpperTrim);
+    if (row.includes("CODE") && row.includes("RTS AWB") && row.includes("CNEE_NAME")) {
+      headerRowIndex = i;
+      console.log("[RTS Import Parser] Found RTS Report header at row", i);
+      break;
+    }
+  }
+  
+  if (headerRowIndex === -1) return [];
+  
+  const headers = matrix[headerRowIndex].map((h) => String(h).trim().toUpperCase());
+  console.log("[RTS Import Parser] Detected headers:", headers);
+  
+  const out = [];
+  
+  for (let r = headerRowIndex + 1; r < matrix.length; r++) {
+    const row = matrix[r];
+    const hasAny = row.some((cell) => String(cell).trim() !== "");
+    if (!hasAny) continue;
+    
+    const obj = {};
+    // Store numeric indices for direct column access
+    for (let c = 0; c < row.length; c++) {
+      obj[c] = row[c];
+    }
+    // Also store named properties from headers
+    for (let c = 0; c < headers.length; c++) {
+      const key = headers[c];
+      if (!key) continue;
+      obj[key] = row[c];
+    }
+    out.push(obj);
+  }
+  
+  return out;
+}
+
+function validateRTSRow(row) {
+  const name = String(row["CNEE_NAME"] || row["SHPR_NAME"] || "").trim();
+  if (!name) return false;
+  
+  const nameUpper = toUpperTrim(name);
+  if (nameUpper === "CNEE_NAME" || nameUpper === "SHPR_NAME") return false;
+  
+  const street = String(row["CNEE_STREET"] || "").trim();
+  if (!street) return false;
+  
+  const awb = String(row["RTS AWB"] || "").trim();
+  if (!awb) return false;
+  
+  return true;
+}
+
+function buildRTSAddress(row) {
+  const parts = [
+    row["CNEE_STREET"],
+    row["CNEE_CITY"] || row["CITY"],
+    row["CNEE_ZIP"] || row["ZIPCODE"]
+  ]
+    .map((v) => String(v ?? "").trim())
+    .filter(Boolean);
+  return parts.join(", ");
+}
+
+function pickRTSCardNumber(row) {
+  // Try to get from CODE column first
+  const code = cleanDigits(String(row["CODE"] || "").trim());
+  if (code.length === 16) return code;
+  
+  // Fallback to AWB
+  const awb = String(row["RTS AWB"] || "").trim();
+  if (cleanDigits(awb).length > 0) return awb;
+  
+  return "";
+}
+
+// GET /deliveries/rts
+router.get("/rts", async (req, res) => {
+  try {
+    const batchId = req.query.batchId || null;
+    const status = req.query.status || null;
+
+    // RTS-only statuses
+    const RTS_STATUSES = [
+      "Bad Address",
+      "Consignee Not Around",
+      "Denied Entry/Access",
+      "Flooded Area",
+      "Office Close",
+      "Relocated",
+      "Refuse to Accept",
+      "Transfer",
+      "Unlocated"
+    ];
+
+    const filter = { status: { $in: RTS_STATUSES } };
+    if (batchId) filter.import_batch_id = batchId;
+    if (status) filter.status = status;
+
+    let deliveries = [];
+    if (batchId || status) {
+      deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).lean();
+    } else {
+      deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).limit(100).lean();
+    }
+
+    deliveries = deliveries.map((d) => ({ ...d, id: d._id.toString() }));
+
+    return res.render("deliveries/rts", {
+      deliveries,
+      batchId,
+      selectedStatus: status,
+    });
+  } catch (err) {
+    console.error("Error fetching RTS deliveries:", err);
+    return res.status(500).send("Error loading RTS deliveries");
+  }
+});
+
+// POST /deliveries/rts/import
+router.post("/rts/import", upload.single("excel_file"), async (req, res) => {
+  try {
+    if (!req.file) return res.redirect("/deliveries/rts");
+
+    const batchId = crypto.randomUUID();
+    const assignedPrinterId = (req.body.assigned_printer_id || "").trim() || null;
+
+    const workbook = xlsx.readFile(req.file.path);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = parseRTSReportRows(sheet);
+
+    console.log("[RTS Import] Parsed rows:", rows.length);
+
+    const docs = [];
+    let invalidCount = 0;
+    let duplicateCount = 0;
+    let updatedCount = 0;
+
+    for (const row of rows) {
+      if (!validateRTSRow(row)) {
+        invalidCount++;
+        continue;
+      }
+
+      const card_number = pickRTSCardNumber(row);
+      const recipient_name = String(row["CNEE_NAME"] || row["SHPR_NAME"] || "").trim();
+      const address = buildRTSAddress(row);
+      const courier = String(row["DEST_PORT"] || "-").trim() || "-";
+      
+      // Get REASON from the REASON column
+      const reason = String(row["REASON"] || "").trim();
+      const status = mapRTSReasonToStatus(reason) || "Unlocated";
+
+      console.log(`[RTS Import] Row: ${card_number} | Reason: "${reason}" | Status: "${status}"`);
+
+      // Check for duplicate
+      const existingDelivery = await CardDelivery.findOne({
+        card_number: card_number,
+        recipient_name: recipient_name,
+        address: address,
+      }).lean();
+
+      if (existingDelivery) {
+        if (status && existingDelivery.status !== status) {
+          console.log(`[RTS Import] Status change: ${card_number} (${existingDelivery.status} → ${status})`);
+          
+          await CardDelivery.updateOne(
+            { _id: existingDelivery._id },
+            { 
+              $set: { 
+                status: status,
+                updated_at: new Date(),
+                import_batch_id: batchId,
+                imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
+                imported_at: new Date(),
+                ship_name: String(row["SHPR_NAME"] || "").trim(),
+                pickup_date: String(row["PICKUP_DATE"] || "").trim(),
+                code: String(row["CODE"] || "").trim(),
+                rts_awb: String(row["RTS AWB"] || "").trim(),
+                cnee_zip: String(row["CNEE_ZIP"] || "").trim(),
+                dest_port: String(row["DEST_PORT"] || "").trim(),
+                cnee_name: String(row["CNEE_NAME"] || "").trim(),
+                cnee_street: String(row["CNEE_STREET"] || "").trim(),
+                date_received: String(row["DATE_RECEIVED"] || "").trim(),
+                reason: reason,
+                remarks: String(row["REMARKS"] || "").trim(),
+                cnee_contact_no: String(row["CNEE_CONTACT_NO"] || "").trim(),
+                reference: String(row["REFERENCE"] || "").trim(),
+                attachment: String(row["ATTACHMENT"] || "").trim(),
+                new_attachment: String(row["NEW_ATTACHMENT"] || "").trim(),
+              } 
+            }
+          );
+          
+          updatedCount++;
+          
+          await addAuditLog(req, {
+            action_type: "UPDATE_DELIVERY_STATUS",
+            entity_type: "CardDelivery",
+            entity_id: existingDelivery._id.toString(),
+            source: "RTS Import (Status Update)",
+            remarks: `RTS status updated: ${existingDelivery.status} → ${status}`,
+            import_batch_id: batchId,
+          });
+        } else {
+          duplicateCount++;
+        }
+        continue;
+      }
+
+      docs.push({
+        card_number,
+        recipient_name,
+        address,
+        courier,
+        status,
+        updated_at: new Date(),
+        import_batch_id: batchId,
+        imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
+        imported_at: new Date(),
+        assigned_printer: assignedPrinterId,
+        ship_name: String(row["SHPR_NAME"] || "").trim(),
+        pickup_date: String(row["PICKUP_DATE"] || "").trim(),
+        code: String(row["CODE"] || "").trim(),
+        rts_awb: String(row["RTS AWB"] || "").trim(),
+        cnee_zip: String(row["CNEE_ZIP"] || "").trim(),
+        dest_port: String(row["DEST_PORT"] || "").trim(),
+        cnee_name: String(row["CNEE_NAME"] || "").trim(),
+        cnee_street: String(row["CNEE_STREET"] || "").trim(),
+        date_received: String(row["DATE_RECEIVED"] || "").trim(),
+        reason: reason,
+        remarks: String(row["REMARKS"] || "").trim(),
+        cnee_contact_no: String(row["CNEE_CONTACT_NO"] || "").trim(),
+        reference: String(row["REFERENCE"] || "").trim(),
+        attachment: String(row["ATTACHMENT"] || "").trim(),
+        new_attachment: String(row["NEW_ATTACHMENT"] || "").trim(),
+      });
+    }
+
+    if (docs.length === 0 && updatedCount === 0) {
+      console.warn("[RTS Import] No valid rows found in file");
+      return res.redirect("/deliveries/rts");
+    }
+
+    let result = [];
+    if (docs.length > 0) {
+      result = await CardDelivery.insertMany(docs);
+    }
+    
+    console.log(`[RTS Import] Inserted ${result.length}. Invalid: ${invalidCount}. Duplicates: ${duplicateCount}. Updated: ${updatedCount}`);
+
+    await addAuditLog(req, {
+      action_type: "IMPORT_RTS_DELIVERIES",
+      entity_type: "CardDelivery",
+      entity_id: "BULK",
+      source: "RTS Import",
+      remarks: `Imported ${result.length} RTS deliveries. Skipped ${invalidCount} invalid, ${duplicateCount} duplicates, updated ${updatedCount} existing.`,
+      import_batch_id: batchId,
+    });
+
+    return res.redirect(`/deliveries/rts?batchId=${encodeURIComponent(batchId)}`);
+  } catch (err) {
+    console.error("Error importing RTS deliveries:", err);
+    if (res.headersSent) return;
+    return res.status(500).send("Error importing RTS deliveries");
+  }
+});
+
+// POST /deliveries/rts/clear-session
+router.post("/rts/clear-session", (req, res) => {
+  res.clearCookie("last_rts_import_batch");
+  return res.redirect("/deliveries/rts");
+});
+
+// GET /deliveries/export - Export deliveries data
+router.get("/export", async (req, res) => {
+  try {
+    const batchId = req.query.batchId || null;
+    const status = req.query.status || null;
+
+    const filter = {};
+    if (batchId) filter.import_batch_id = batchId;
+    if (status) filter.status = status;
+
+    const deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).lean();
+
+    if (deliveries.length === 0) {
+      return res.status(400).send("No data to export");
+    }
+
+    // Convert to export format
+    const exportData = deliveries.map((d) => ({
+      ID: d._id.toString(),
+      "Card / Ref #": d.card_number,
+      Recipient: d.recipient_name,
+      Address: d.address,
+      Courier: d.courier || "-",
+      Status: d.status,
+      "Updated At": d.updated_at ? new Date(d.updated_at).toISOString() : "-",
+    }));
+
+    const ws = xlsx.utils.json_to_sheet(exportData);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "Deliveries");
+
+    const fileName = `deliveries_${new Date().getTime()}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+
+    res.send(xlsx.write(wb, { type: "buffer" }));
+  } catch (err) {
+    console.error("Error exporting deliveries:", err);
+    return res.status(500).send("Error exporting deliveries");
+  }
+});
+
+// GET /deliveries/rts/export - Export RTS data
+router.get("/rts/export", async (req, res) => {
+  try {
+    const batchId = req.query.batchId || null;
+    const status = req.query.status || null;
+
+    const RTS_STATUSES = [
+      "Bad Address",
+      "Consignee Not Around",
+      "Denied Entry/Access",
+      "Flooded Area",
+      "Office Close",
+      "Relocated",
+      "Refuse to Accept",
+      "Transfer",
+      "Unlocated"
+    ];
+
+    const filter = { status: { $in: RTS_STATUSES } };
+    if (batchId) filter.import_batch_id = batchId;
+    if (status) filter.status = status;
+
+    const deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).lean();
+
+    if (deliveries.length === 0) {
+      return res.status(400).send("No RTS data to export");
+    }
+
+    // Convert to export format
+    const exportData = deliveries.map((d) => ({
+      NO: "",
+      SHPR_NAME: d.ship_name || "",
+      PICKUP_DATE: d.pickup_date || "",
+      CODE: d.code || "",
+      RTS_AWB: d.rts_awb || "",
+      CNEE_ZIP: d.cnee_zip || "",
+      DEST_PORT: d.dest_port || "",
+      CNEE_NAME: d.cnee_name || "",
+      CNEE_STREET: d.cnee_street || "",
+      DATE_RECEIVED: d.date_received || "",
+      REASON: d.reason || "",
+      REMARKS: d.remarks || "",
+      CNEE_CONTACT_NO: d.cnee_contact_no || "",
+      REFERENCE: d.reference || "",
+      ATTACHMENT: d.attachment || "",
+      NEW_ATTACHMENT: d.new_attachment || "",
+      Status: d.status,
+      Updated_At: d.updated_at ? new Date(d.updated_at).toISOString() : "-",
+    }));
+
+    const ws = xlsx.utils.json_to_sheet(exportData);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "RTS");
+
+    const fileName = `rts_${new Date().getTime()}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+
+    res.send(xlsx.write(wb, { type: "buffer" }));
+  } catch (err) {
+    console.error("Error exporting RTS data:", err);
+    return res.status(500).send("Error exporting RTS data");
+  }
 });
 
 module.exports = router;
