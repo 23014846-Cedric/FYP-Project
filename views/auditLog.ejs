@@ -404,7 +404,21 @@
             </td>
 
             <td><strong><%= log.username || log.user_email || "System" %></strong></td>
-            <td><%= log.action_type || "-" %></td>
+            <% const suspiciousSafe = (typeof suspicious !== "undefined" && suspicious) ? suspicious : {}; %>
+
+            <td>
+              <%= log.action_type || "-" %>
+              <% const flag = suspiciousSafe[String(log._id)]; %>
+              <% if (flag) { %>
+                <span
+                  class="badge bg-danger ms-2"
+                  title="<%= String((flag.reasons || []).join(' | ')).replace(/"/g, '&quot;') %>"
+                >
+                  Flagged
+                </span>
+              <% } %>
+            </td>
+
             <td><%= log.entity_type || "-" %></td>
             <td><code><%= log.entity_id || "-" %></code></td>
             <td><%= log.source || "Web" %></td>
