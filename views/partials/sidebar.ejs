@@ -52,82 +52,8 @@
       width: 20px;
       opacity: 0.85;
     }
+ 
 
-<<<<<<< HEAD
-        <ul>
-            <% if (user && user.role === "admin") { %>
-                <!-- ADMIN MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/admin/profile">Admin Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/exceptions">Exceptions</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/deliveries">Import Deliveries</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/auditLog">Audit Trail</a>
-                </li>
-                <li class="nav-item">
-                <a class="nav-link" href="/admin/review">Suspicious Review</a>
-                </li>
-
-                <!-- Function just to demonstrate blockchain audit logging works -->
-                <li class="hidden">
-                    <a class="nav-link" href="/auditDemo">Audit Hash</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>
-            <% } else if (user && user.role === "printer") { %>
-                <!-- PRINTER MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/printer/returns">Returned Cards</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>
-            <% } else if (user && user.role === "operations") { %>
-                <!-- NORMAL LOGGED-IN USER MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/exceptions">Exceptions</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/deliveries">Deliveries</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/messages">Messages</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>      
-            <% } else if (user && user.role === "courier") { %>
-                <!-- NORMAL LOGGED-IN USER MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/profile">Profile</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/courier/deliveries">My Deliveries</a>
-                <li class="nav-item">
-                    <a class="nav-link text-danger fw-bold" href="/logout">Logout</a>
-                </li>            
-            <% }  else { %>
-                <!-- GUEST MENU -->
-                <li class="nav-item">
-                    <a class="nav-link" href="/login">Login</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link text-primary fw-bold" href="/signup">Register</a>
-                </li>
-            <% } %> 
-=======
     .hidden {
       display: none !important;
     }
@@ -188,13 +114,15 @@
           <li><a class="nav-link sub-link" href="/deliveries/rts">Return to Sender</a></li>
           <li><a class="nav-link sub-link" href="/deliveries/dispatchlist">Dispatch List</a></li>
           <li><a class="nav-link sub-link" href="/deliveries/progressivereports">Progressive Reports</a></li>
->>>>>>> 58627d357a1937e8885c1b78a72275bacdbc7fa8
         </ul>
       </li>
 
       <li class="nav-item">
         <a class="nav-link" href="/auditLog">Audit Trail</a>
       </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/admin/review">Suspicious Review</a>
+        </li>
 
       <!-- Function just to demonstrate blockchain audit logging works -->
       <li class="hidden">
