@@ -6,15 +6,15 @@
 </head>
 
 <body class="p-4">
-  <%- include("partials/navbar") %>
+  <%- include("../partials/navbar") %>
   <div class="sidebar-hover-zone"></div>
-  <%- include("partials/sidebar") %>
+  <%- include("../partials/sidebar") %>
 
   <br>
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Import Dispatch List</h1>
 
-    <!-- ✅ UPDATED path to match app.js mount: /deliveries/dispatchlist -->
+    <!--  UPDATED path to match app.js mount: /deliveries/dispatchlist -->
     <form method="POST" action="/deliveries/dispatchlist/clear-session" class="m-0">
       <button class="btn btn-outline-danger btn-sm" type="submit">Clear Session</button>
     </form>
@@ -145,7 +145,7 @@
 
   <% } %>
 
-  <%- include('partials/footer') %>
+  <%- include('../partials/footer') %>
 
 <script>
 (() => {
