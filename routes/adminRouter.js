@@ -57,17 +57,29 @@ router.post("/users/:id/delete", requireRole("admin"), async (req, res) => {
 // GET /admin/review  (recent compliance review)
 router.get("/review", requireRole("admin"), async (req, res) => {
   try {
-    // ✅ recent window (last 7 days)
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    // ✅ pull recent logs across whole website (AuditLog is global)
-    const logs = await AuditLog.find({
-      timestamp: { $gte: since },
-      action_type: { $ne: "DEMO_ACTION" }, // optional: hide demo/test rows
-    })
+    // ----- Filters (Option 1: no time window) -----
+    const type = String(req.query.type || "all").toLowerCase();     // all | burst | auth | anchoring | flipflop | sensitive | other
+    const userQ = String(req.query.user || "").trim();              // username search
+    const minSeverity = Math.max(parseInt(req.query.minSeverity || "1", 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || "200", 10) || 200, 50), 1000); // 50–1000
+
+
+    // ----- Load recent logs -----
+    const findQuery = {
+      action_type: { $ne: "DEMO_ACTION" },
+    };
+
+    if (userQ) {
+      const safe = userQ.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      findQuery.username = new RegExp(safe, "i");
+    }
+
+    const logs = await AuditLog.find(findQuery)
       .sort({ timestamp: -1 })
-      .limit(2000)
+      .limit(3000) // safety cap
       .lean();
+
 
     // ✅ compute flags from the recent logs
     const suspiciousMap = buildSuspiciousMap(logs);
@@ -76,6 +88,9 @@ router.get("/review", requireRole("admin"), async (req, res) => {
   const t = new Date(x || 0).getTime();
   return Number.isFinite(t) ? t : 0;
 }
+
+
+
 
 // ===============================
 // OPTION A: GROUP INTO INCIDENTS
@@ -209,12 +224,39 @@ if (authBurstReason) {
   ...otherIncidents,
 ].sort((a, b) => b.time - a.time);
 
+let filteredIncidents = incidents;
+
+// Filter by type
+if (type !== "all") {
+  filteredIncidents = filteredIncidents.filter((it) => {
+    const code = String(it.type || "").toUpperCase();
+    const label = String(it.suspiciousType || "").toLowerCase();
+
+    if (type === "burst") return code === "BURST_EDITS" || label.includes("burst");
+    if (type === "auth") return code === "AUTH_BURST" || label.includes("login/logout");
+    if (type === "anchoring") return label.includes("anchoring");
+    if (type === "flipflop") return label.includes("flip");
+    if (type === "sensitive") return label.includes("sensitive");
+    if (type === "other") return code === "OTHER";
+    return true;
+  });
+}
+
+// Filter by minimum severity
+filteredIncidents = filteredIncidents.filter(
+  (it) => (it.severity || 1) >= minSeverity
+);
+
+// Limit results (keeps UI clean)
+filteredIncidents = filteredIncidents.slice(0, limit);
+
 
     return res.render("adminReview", {
-      incidents,
+      incidents: filteredIncidents,
       user: req.user,
-      since, // so you can display "last 7 days"
+      filters: { type, user: userQ, minSeverity },
     });
+
   } catch (err) {
     console.error("Error loading compliance review:", err);
     return res.status(500).send("Failed to load review page.");

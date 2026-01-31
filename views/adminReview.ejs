@@ -17,15 +17,65 @@
   <div class="container-fluid mt-4">
     <h2 class="mb-4">Suspicious Activity Review</h2>
 
+    <form method="GET" action="/admin/review" class="row g-2 mb-3">
+    <% const f = (typeof filters !== "undefined" && filters) ? filters : {}; %>
+    <% const t = String(f.type || "all"); %>
+    <% const ms = Number(f.minSeverity || 1); %>
+    <% const lim = Number(f.limit || 200); %>
+
+    <div class="col-auto">
+      <label class="form-label mb-0 small text-muted">Type</label>
+      <select name="type" class="form-select form-select-sm">
+        <option value="all" <%= t==="all" ? "selected" : "" %>>All</option>
+        <option value="burst" <%= t==="burst" ? "selected" : "" %>>Burst edits</option>
+        <option value="auth" <%= t==="auth" ? "selected" : "" %>>Login/Logout burst</option>
+        <option value="anchoring" <%= t==="anchoring" ? "selected" : "" %>>After anchoring</option>
+        <option value="flipflop" <%= t==="flipflop" ? "selected" : "" %>>Status flip-flop</option>
+        <option value="sensitive" <%= t==="sensitive" ? "selected" : "" %>>Sensitive edits</option>
+        <option value="other" <%= t==="other" ? "selected" : "" %>>Other</option>
+      </select>
+    </div>
+
+    <div class="col-auto">
+      <label class="form-label mb-0 small text-muted">User</label>
+      <input
+        type="text"
+        name="user"
+        class="form-control form-control-sm"
+        placeholder="e.g. admin"
+        value="<%= f.user ? f.user : "" %>"
+      />
+    </div>
+
+    <div class="col-auto">
+      <label class="form-label mb-0 small text-muted">Min severity</label>
+      <select name="minSeverity" class="form-select form-select-sm">
+        <% [1,2,3,4,5].forEach(x => { %>
+          <option value="<%= x %>" <%= ms === x ? "selected" : "" %>><%= x %>+</option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="col-auto">
+      <label class="form-label mb-0 small text-muted">Limit</label>
+      <select name="limit" class="form-select form-select-sm">
+        <% [100,200,300,500,1000].forEach(x => { %>
+          <option value="<%= x %>" <%= lim === x ? "selected" : "" %>><%= x %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="col-auto d-flex align-items-end">
+      <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+      <a href="/admin/review" class="btn btn-outline-secondary btn-sm ms-2">Reset</a>
+    </div>
+  </form>
+
+
     <div class="d-flex align-items-center mb-3">
     <a href="/admin/review" class="btn btn-outline-primary btn-sm">
       Refresh
     </a>
-    <% if (typeof since !== "undefined") { %>
-      <span class="text-muted ms-3">
-        Showing recent activity since <%= since.toLocaleDateString("en-SG") %>
-      </span>
-    <% } %>
   </div>
 
 
