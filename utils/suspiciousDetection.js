@@ -21,12 +21,45 @@ const DEFAULTS = {
   sensitiveThreshold: 3,       // address edits in sensitiveWindowMs
 };
 
-function isFlipFlop(a, b, c) {
-  // Example: Delivered -> Failed -> Delivered OR Failed -> Delivered -> Failed
-  const pattern1 = a === "Delivered" && b === "Failed" && c === "Delivered";
-  const pattern2 = a === "Failed" && b === "Delivered" && c === "Failed";
-  return pattern1 || pattern2;
+const FINAL_STATUSES = ["Delivered"];
+
+const PROBLEM_STATUSES = [
+  "Bad Address",
+  "Consignee Not Around",
+  "Denied Entry/Access",
+  "Flooded Area",
+  "Office Close",
+  "Relocated",
+  "Refuse to Accept",
+  "Transfer",
+  "Unlocated",
+  "Return to Centre",
+  "Return to Sender",
+  "No Updates",
+];
+
+function statusType(status) {
+  if (!status) return "unknown";
+  if (FINAL_STATUSES.includes(status)) return "final";
+  if (PROBLEM_STATUSES.includes(status)) return "problem";
+  return "other";
 }
+
+
+function isFlipFlop(a, b, c) {
+  const t1 = statusType(a);
+  const t2 = statusType(b);
+  const t3 = statusType(c);
+
+  // Delivered → Problem → Delivered
+  if (t1 === "final" && t2 === "problem" && t3 === "final") return true;
+
+  // Problem → Delivered → Problem
+  if (t1 === "problem" && t2 === "final" && t3 === "problem") return true;
+
+  return false;
+}
+
 
 // Try to detect whether a log entry is an address/sensitive edit.
 // Adjust keywords to match your actual payload fields.
@@ -164,7 +197,7 @@ for (const [user, arr] of authByUser.entries()) {
       suspicious[latestId].reasons.push(
         `Login/Logout burst: ${count} auth events within ${Math.round(authWindowMs / 60000)} min by user ${user}`
       );
-      suspicious[latestId].severity += 2;
+      suspicious[latestId].severity += 1; // low severity
     }
   }
 }

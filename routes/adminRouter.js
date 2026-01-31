@@ -5,6 +5,7 @@ const router = express.Router();
 
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
+const ReviewNote = require("../models/ReviewNote");
 const requireRole = require("../middleware/requireRole");
 const { buildSuspiciousMap } = require("../utils/suspiciousDetection");
 
@@ -150,6 +151,7 @@ if (authBurstReason) {
   }
 
    otherIncidents.push({
+    incidentId: `LOG::${String(log._id)}`,
     suspiciousType: inferSuspiciousType(reasons),
     type: "OTHER",
     user: log.username || "System",
@@ -197,25 +199,26 @@ if (authBurstReason) {
     // Build final incident list
     const incidents = [
   ...Array.from(burstGroups.values()).map(g => ({
+    incidentId: `BURST_EDITS::${g.user}::${g.endTime}`,
     suspiciousType: "Burst edits",
     type: "BURST_EDITS",
     user: g.user,
     time: g.endTime,
     entitySummary: `${g.entities.size} delivery(s)`,
-    severity: g.severity || 2,
+    severity: g.maxCount >= 15 ? 4 : g.maxCount >= 10 ? 3 : 2,
     reasons: [
       `Burst edits: ${g.maxCount} actions within 10 min by user ${g.user}`,
     ],
   })),
 
-  // ✅ ADD THIS BLOCK
   ...Array.from(authGroups.values()).map(g => ({
+    incidentId: `AUTH_BURST::${g.user}::${g.endTime}`,
     suspiciousType: "Login/Logout burst",
     type: "AUTH_BURST",
     user: g.user,
     time: g.endTime,
     entitySummary: `Authentication activity`,
-    severity: g.severity || 2,
+    severity: 1,
     reasons: [
       `Login/Logout burst: ${g.maxCount} auth events within 10 min by user ${g.user}`,
     ],
@@ -250,11 +253,32 @@ filteredIncidents = filteredIncidents.filter(
 // Limit results (keeps UI clean)
 filteredIncidents = filteredIncidents.slice(0, limit);
 
+// Load review notes for the incidents shown on this page
+const incidentIds = filteredIncidents
+  .map(i => i.incidentId)
+  .filter(Boolean);
+
+const notes = await ReviewNote.find({
+  incident_id: { $in: incidentIds },
+})
+  .sort({ reviewed_at: -1 })
+  .lean();
+
+const notesByIncident = {};
+for (const n of notes) {
+  if (!notesByIncident[n.incident_id]) {
+    notesByIncident[n.incident_id] = [];
+  }
+  notesByIncident[n.incident_id].push(n);
+}
+
+
 
     return res.render("adminReview", {
       incidents: filteredIncidents,
+      notesByIncident,
       user: req.user,
-      filters: { type, user: userQ, minSeverity },
+      filters: { type, user: userQ, minSeverity, limit },
     });
 
   } catch (err) {
@@ -262,6 +286,40 @@ filteredIncidents = filteredIncidents.slice(0, limit);
     return res.status(500).send("Failed to load review page.");
   }
 });
+
+// POST /admin/review/note  (add a case note)
+router.post("/review/note", requireRole("admin"), async (req, res) => {
+  try {
+    const { incidentId, review_status, review_comment } = req.body;
+
+    await ReviewNote.create({
+      incident_id: incidentId,
+      review_status,
+      review_comment,
+      reviewed_by: {
+        user_id: req.user.id,
+        username: req.user.name || req.user.email || "admin",
+      },
+    });
+
+    res.redirect("/admin/review");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to save note");
+  }
+});
+
+//delete route for review note
+router.post("/review/note/:id/delete", requireRole("admin"), async (req, res) => {
+  try {
+    await ReviewNote.findByIdAndDelete(req.params.id);
+    res.redirect("/admin/review");
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Failed to delete note");
+  }
+});
+
 
 
 module.exports = router;

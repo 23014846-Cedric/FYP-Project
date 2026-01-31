@@ -88,6 +88,7 @@
       <th>Entity</th>
       <th>Severity</th>
       <th>Reasons</th>
+      <th>Case Notes</th>
     </tr>
   </thead>
   <tbody>
@@ -123,6 +124,45 @@
             <li><%= r %></li>
           <% }) %>
         </ul>
+      </td>
+
+      <td style="min-width:300px">
+        <% const notes = notesByIncident[item.incidentId] || []; %>
+
+        <form method="POST" action="/admin/review/note" class="mb-2">
+          <input type="hidden" name="incidentId" value="<%= item.incidentId %>">
+
+          <select name="review_status" class="form-select form-select-sm mb-1">
+            <option value="pending">pending</option>
+            <option value="investigating">investigating</option>
+            <option value="approved">approved</option>
+          </select>
+
+          <textarea
+            name="review_comment"
+            class="form-control form-control-sm mb-1"
+            rows="2"
+            placeholder="Add case note..."
+          ></textarea>
+
+          <button class="btn btn-sm btn-primary">Save</button>
+        </form>
+
+        <% notes.forEach(n => { %>
+          <div class="border rounded p-2 mb-2 small">
+            <div class="d-flex justify-content-between">
+              <strong><%= n.review_status %></strong>
+              <form method="POST" action="/admin/review/note/<%= n._id %>/delete">
+                <button class="btn btn-sm btn-outline-danger">Delete</button>
+              </form>
+            </div>
+            <div class="text-muted">
+              <%= n.reviewed_by.username %> —
+              <%= new Date(n.reviewed_at).toLocaleString("en-SG") %>
+            </div>
+            <div><%= n.review_comment %></div>
+          </div>
+        <% }) %>
       </td>
     </tr>
   <% }) %>
