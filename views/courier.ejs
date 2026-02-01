@@ -168,6 +168,12 @@
   const nextBtn = document.getElementById("nextPage");
   const deliveryCount = document.getElementById("deliveryCount");
 
+  // Exit if required elements are missing
+  if (!searchInput || !rowsPerPageSelect || !pageInfo || !prevBtn || !nextBtn || !deliveryCount) {
+    console.warn("[Courier Search] Missing required elements");
+    return;
+  }
+
   let currentPage = 1;
   let rowsPerPage = parseInt(rowsPerPageSelect.value, 10);
 
@@ -218,14 +224,14 @@
     nextBtn.disabled = currentPage === totalPages;
   }
 
-  searchInput.addEventListener("input", () => { currentPage = 1; render(); });
-  rowsPerPageSelect.addEventListener("change", () => {
+  if (searchInput) searchInput.addEventListener("input", () => { currentPage = 1; render(); });
+  if (rowsPerPageSelect) rowsPerPageSelect.addEventListener("change", () => {
     rowsPerPage = parseInt(rowsPerPageSelect.value, 10);
     currentPage = 1;
     render();
   });
-  prevBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; render(); } });
-  nextBtn.addEventListener("click", () => { currentPage++; render(); });
+  if (prevBtn) prevBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; render(); } });
+  if (nextBtn) nextBtn.addEventListener("click", () => { currentPage++; render(); });
 
   render();
 })();
