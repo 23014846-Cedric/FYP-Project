@@ -11,8 +11,6 @@ const authMiddleware = require("../middleware/authMiddleware");
 const { addAuditLog } = require("../utils/audit");
 
 const CardDelivery = require("../models/CardDelivery");
-const DispatchList = require("../models/DispatchList");
-const ProgressiveReport = require("../models/ProgressiveReport");
 
 // Multer: temp upload folder
 const upload = multer({ dest: "uploads/" });
@@ -869,35 +867,90 @@ router.get("/rts/export", async (req, res) => {
 // ==========================
 // Dispatch List (inside /deliveries)
 // GET /deliveries/dispatchlist
-// POST /deliveries/dispatchlist/import
+// GET /deliveries/dispatchlist
 // ==========================
 router.get("/dispatchlist", async (req, res) => {
-  const batchId = req.query.batch || req.session.dispatchBatchId || "";
-  const dispatches = req.session.dispatches || [];
-  // your file path: views/deliveries/dispatchList.ejs
-  return res.render("deliveries/dispatchList", { dispatches, batchId });
+  try {
+    const batchId = req.query.batchId || req.query.batch || null;
+    let dispatches = [];
+
+    if (batchId) {
+      dispatches = await CardDelivery.find({ import_batch_id: batchId, record_type: 'dispatch' }).sort({ created_at: -1 }).lean();
+    } else {
+      dispatches = await CardDelivery.find({ record_type: 'dispatch' }).sort({ imported_at: -1 }).limit(100).lean();
+    }
+
+    dispatches = dispatches.map(d => ({ ...d, id: d._id.toString() }));
+    console.log("[Dispatch List GET] batchId:", batchId, "dispatches count:", dispatches.length);
+    return res.render("deliveries/dispatchList", { dispatches, batchId });
+  } catch (err) {
+    console.error("Error fetching dispatch list:", err);
+    return res.status(500).send("Error loading dispatch list");
+  }
 });
 
 router.post("/dispatchlist/clear-session", (req, res) => {
-  req.session.dispatches = [];
-  req.session.dispatchBatchId = "";
   return res.redirect("/deliveries/dispatchlist");
 });
 
 router.post("/dispatchlist/import", upload.single("excel_file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).send("No file uploaded.");
+    console.log("[Dispatch Import] Starting import, file:", req.file?.originalname);
+    if (!req.file) {
+      console.error("[Dispatch Import] No file uploaded");
+      return res.status(400).send("No file uploaded.");
+    }
 
+    console.log("[Dispatch Import] Reading file:", req.file.path);
     const wb = xlsx.readFile(req.file.path);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = xlsx.utils.sheet_to_json(ws, { defval: "" });
+    
+    // Read the sheet as 2D array to handle multi-row headers
+    const matrix = xlsx.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    
+    console.log("[Dispatch Import] Matrix rows:", matrix.length);
+    console.log("[Dispatch Import] First few rows:");
+    for (let i = 0; i < Math.min(3, matrix.length); i++) {
+      console.log(`  Row ${i}:`, matrix[i].slice(0, 5));
+    }
 
-    const mapped = rows
-      .map((r, idx) => {
+    let headerRowIndex = -1;
+    let dataStartIndex = 0;
+
+    // Find the header row - look for a row that contains column names
+    for (let i = 0; i < Math.min(5, matrix.length); i++) {
+      const row = matrix[i].map(cell => String(cell || "").trim().toUpperCase());
+      console.log(`[Dispatch Import] Row ${i} check:`, row.includes("NO"), row.includes("NAME"), row.includes("PAN"));
+      
+      if (row.includes("NO") || row.includes("NAME") || row.includes("PAN")) {
+        headerRowIndex = i;
+        dataStartIndex = i + 1;
+        console.log("[Dispatch Import] Found header row at index:", i);
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      console.error("[Dispatch Import] Could not find header row");
+      return res.status(400).send("Could not find header row in Excel file. Expected columns: NO, NAME, PAN, ADDRESS1, etc.");
+    }
+
+    const headerRow = matrix[headerRowIndex].map(cell => String(cell || "").trim());
+    const dataRows = matrix.slice(dataStartIndex);
+
+    console.log("[Dispatch Import] Header row:", headerRow.slice(0, 5));
+    console.log("[Dispatch Import] Data rows found:", dataRows.length);
+
+    const mapped = dataRows
+      .map((row, idx) => {
+        // Create object mapping headers to values
         const obj = {};
-        for (const k of Object.keys(r)) obj[normKey(k)] = r[k];
+        for (let i = 0; i < headerRow.length; i++) {
+          const header = normKey(headerRow[i]);
+          obj[header] = row[i] || "";
+        }
 
-        return {
+        const result = {
           no: obj["NO"] || (idx + 1),
           name: obj["NAME"] || "",
           pan: obj["PAN"] || "",
@@ -909,63 +962,165 @@ router.post("/dispatchlist/import", upload.single("excel_file"), async (req, res
           state: obj["STATE"] || "",
           country: obj["COUNTRY"] || "",
           zipCode: obj["ZIP CODE"] || obj["ZIPCODE"] || "",
-          mobileNo: obj["MOBILE NO."] || obj["MOBILE NO"] || "",
+          mobileNo: obj["MOBILE NO"] || obj["MOBILE NO."] || "",
           product: obj["PRODUCT"] || "",
           referenceNumber: obj["REFERENCE NUMBER"] || "",
           fileName: obj["FILE NAME"] || "",
           awbNumber: obj["AWB NUMBER"] || "",
           dispatchDate: parseDate(obj["DISPATCH DATE"]),
         };
-      })
-      .filter((x) => x.referenceNumber || x.name);
+
+        if (idx === 0) {
+          console.log("[Dispatch Import] First mapped row:", result);
+        }
+
+        return result;
+      });
+
+    console.log("[Dispatch Import] Mapped rows:", mapped.length);
 
     const batchId = String(Date.now());
-    req.session.dispatches = mapped;
-    req.session.dispatchBatchId = batchId;
+    const importedBy = req.user?._id?.toString() || req.user?.email || req.user?.name || "system";
 
-    const ops = mapped
-      .filter((m) => m.referenceNumber)
-      .map((m) => ({
-        updateOne: {
-          filter: { referenceNumber: m.referenceNumber, fileName: m.fileName || "" },
-          update: { $set: m },
-          upsert: true,
-        },
-      }));
+    console.log("[Dispatch Import] Batch ID:", batchId, "Imported by:", importedBy);
 
-    if (ops.length) await DispatchList.bulkWrite(ops, { ordered: false });
+    const docs = [];
+
+    for (let idx = 0; idx < mapped.length; idx++) {
+      const m = mapped[idx];
+      
+      // Add record_type and batch info to all records
+      const recordWithType = { 
+        ...m, 
+        record_type: 'dispatch', 
+        import_batch_id: batchId, 
+        imported_by: importedBy, 
+        imported_at: new Date() 
+      };
+
+      docs.push(recordWithType);
+    }
+
+    console.log("[Dispatch Import] Documents to insert:", docs.length);
+    if (docs.length > 0) {
+      console.log("[Dispatch Import] First doc:", docs[0]);
+    }
+
+    let savedCount = 0;
+
+    // Insert all documents directly
+    if (docs.length > 0) {
+      try {
+        const result = await CardDelivery.insertMany(docs, { ordered: false });
+        savedCount = result.length;
+        console.log("[Dispatch Import] insertMany successful. Inserted:", savedCount);
+      } catch (dbErr) {
+        console.error("[Dispatch Import] insertMany error:", dbErr.message);
+        console.error("[Dispatch Import] Full error:", dbErr);
+        return res.status(500).send("Failed to save dispatch list to database: " + dbErr.message);
+      }
+    } else {
+      console.warn("[Dispatch Import] No documents to insert");
+    }
+
+    if (savedCount === 0) {
+      console.warn("[Dispatch Import] No records were saved");
+      return res.status(400).send("No valid records to import");
+    }
 
     await addAuditLog(req, {
       action_type: "IMPORT_DISPATCH_LIST",
       entity_type: "DispatchList",
       entity_id: "BULK",
       source: "Dispatch List Import",
-      remarks: `Imported ${mapped.length} dispatch list rows`,
+      remarks: `Imported ${savedCount} dispatch list records`,
       import_batch_id: batchId,
     });
 
-    return res.redirect(`/deliveries/dispatchlist?batch=${encodeURIComponent(batchId)}`);
+    console.log("[Dispatch Import] Redirecting to:", `/deliveries/dispatchlist?batchId=${batchId}`);
+    return res.redirect(`/deliveries/dispatchlist?batchId=${encodeURIComponent(batchId)}`);
   } catch (err) {
-    console.error("Dispatch import error:", err);
-    return res.status(500).send("Failed to import dispatch list.");
+    console.error("[Dispatch Import] Caught error:", err);
+    return res.status(500).send("Failed to import dispatch list: " + err.message);
+  }
+});
+
+
+// GET /deliveries/dispatchlist/export
+router.get("/dispatchlist/export", async (req, res) => {
+  try {
+    const batchId = req.query.batchId || null;
+    const status = req.query.status || null;
+
+    const filter = { record_type: 'dispatch' };
+    if (batchId) filter.import_batch_id = batchId;
+    if (status) filter.status = status;
+
+    const dispatches = await CardDelivery.find(filter).sort({ created_at: -1 }).lean();
+    if (dispatches.length === 0) return res.status(400).send("No dispatch list data to export");
+
+    const exportData = dispatches.map((d) => ({
+      NO: d.no || "",
+      NAME: d.name || "",
+      PAN: d.pan || "",
+      ADDRESS1: d.address1 || "",
+      ADDRESS2: d.address2 || "",
+      ADDRESS3: d.address3 || "",
+      ADDRESS4: d.address4 || "",
+      CITY: d.city || "",
+      STATE: d.state || "",
+      COUNTRY: d.country || "",
+      "ZIP CODE": d.zipCode || "",
+      "MOBILE NO": d.mobileNo || "",
+      PRODUCT: d.product || "",
+      "REFERENCE NUMBER": d.referenceNumber || "",
+      "FILE NAME": d.fileName || "",
+      "AWB NUMBER": d.awbNumber || "",
+      "DISPATCH DATE": d.dispatchDate ? new Date(d.dispatchDate).toLocaleDateString() : "",
+      STATUS: d.status || "",
+      Updated_At: d.updated_at ? new Date(d.updated_at).toISOString() : "-",
+    }));
+
+    const ws = xlsx.utils.json_to_sheet(exportData);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "Dispatch");
+
+    const fileName = `dispatch_list_${Date.now()}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    return res.send(xlsx.write(wb, { type: "buffer" }));
+  } catch (err) {
+    console.error("Error exporting dispatch list data:", err);
+    return res.status(500).send("Error exporting dispatch list data");
   }
 });
 
 // ==========================
 // Progressive Reports (inside /deliveries)
 // GET /deliveries/progressivereports
-// POST /deliveries/progressivereports/import
+// GET /deliveries/progressivereports
 // ==========================
 router.get("/progressivereports", async (req, res) => {
-  const batchId = req.query.batch || req.session.progressiveBatchId || "";
-  const reports = req.session.reports || [];
-  // your file path: views/deliveries/progressiveReport.ejs
-  return res.render("deliveries/progressiveReport", { reports, batchId });
+  try {
+    const batchId = req.query.batchId || req.query.batch || null;
+    let reports = [];
+
+    if (batchId) {
+      reports = await CardDelivery.find({ import_batch_id: batchId, record_type: 'progressive' }).sort({ created_at: -1 }).lean();
+    } else {
+      reports = await CardDelivery.find({ record_type: 'progressive' }).sort({ imported_at: -1 }).limit(100).lean();
+    }
+
+    reports = reports.map(r => ({ ...r, id: r._id.toString() }));
+    console.log("[Progressive Report GET] batchId:", batchId, "reports count:", reports.length);
+    return res.render("deliveries/progressiveReport", { reports, batchId });
+  } catch (err) {
+    console.error("Error fetching progressive reports:", err);
+    return res.status(500).send("Error loading progressive reports");
+  }
 });
 
 router.post("/progressivereports/clear-session", (req, res) => {
-  req.session.reports = [];
-  req.session.progressiveBatchId = "";
   return res.redirect("/deliveries/progressivereports");
 });
 
@@ -975,14 +1130,53 @@ router.post("/progressivereports/import", upload.single("excel_file"), async (re
 
     const wb = xlsx.readFile(req.file.path);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = xlsx.utils.sheet_to_json(ws, { defval: "" });
+    
+    // Read the sheet as 2D array to handle multi-row headers
+    const matrix = xlsx.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    
+    console.log("[Progressive Import] Matrix rows:", matrix.length);
+    console.log("[Progressive Import] First row:", matrix[0]);
+    console.log("[Progressive Import] Second row (potential headers):", matrix[1]);
 
-    const mapped = rows
-      .map((r, idx) => {
+    let headerRowIndex = -1;
+    let dataStartIndex = 0;
+
+    // Find the header row - look for a row that contains column names like NUMBER, NAME, PAN, etc.
+    for (let i = 0; i < Math.min(5, matrix.length); i++) {
+      const row = matrix[i].map(cell => String(cell || "").trim().toUpperCase());
+      if (row.includes("NUMBER") || row.includes("NO") || row.includes("NAME")) {
+        headerRowIndex = i;
+        dataStartIndex = i + 1;
+        console.log("[Progressive Import] Found header row at index:", i);
+        break;
+      }
+    }
+
+    if (headerRowIndex === -1) {
+      return res.status(400).send("Could not find header row in Excel file. Expected columns: NUMBER, NAME, PAN, ADDRESS1, etc.");
+    }
+
+    const headerRow = matrix[headerRowIndex].map(cell => String(cell || "").trim());
+    const dataRows = matrix.slice(dataStartIndex);
+
+    console.log("[Progressive Import] Headers:", headerRow);
+    console.log("[Progressive Import] Data rows:", dataRows.length);
+    if (dataRows.length > 0) {
+      console.log("[Progressive Import] First data row:", dataRows[0]);
+    }
+
+    const mapped = dataRows
+      .map((row, idx) => {
+        // Create object mapping headers to values
         const obj = {};
-        for (const k of Object.keys(r)) obj[normKey(k)] = r[k];
+        for (let i = 0; i < headerRow.length; i++) {
+          const header = normKey(headerRow[i]);
+          obj[header] = row[i] || "";
+        }
 
-        return {
+        console.log(`[Progressive Import] Row ${idx} normalized keys:`, Object.keys(obj).slice(0, 5), "...");
+
+        const result = {
           number: obj["NUMBER"] || obj["NO"] || (idx + 1),
           name: obj["NAME"] || "",
           pan: obj["PAN"] || "",
@@ -991,7 +1185,7 @@ router.post("/progressivereports/import", upload.single("excel_file"), async (re
           address3: obj["ADDRESS3"] || "",
           address4: obj["ADDRESS4"] || "",
           zipCode: obj["ZIPCODE"] || obj["ZIP CODE"] || "",
-          mobileNo: obj["MOBILE NO."] || obj["MOBILE NO"] || "",
+          mobileNo: obj["MOBILE NO"] || obj["MOBILE NO."] || "",
           product: obj["PRODUCT"] || "",
           referenceNumber: obj["REFERENCE NUMBER"] || "",
           fileName: obj["FILE NAME"] || "",
@@ -1003,38 +1197,130 @@ router.post("/progressivereports/import", upload.single("excel_file"), async (re
           remarks: obj["REMARKS"] || "",
           port: obj["PORT"] || "",
         };
-      })
-      .filter((x) => x.referenceNumber || x.name);
+
+        if (idx === 0) {
+          console.log(`[Progressive Import] First data row mapped:`, result);
+        }
+
+        return result;
+      });
+
+    console.log("[Progressive Import] Mapped rows:", mapped.length);
+    if (mapped.length > 0) {
+      console.log("[Progressive Import] First mapped row:", mapped[0]);
+    }
 
     const batchId = String(Date.now());
-    req.session.reports = mapped;
-    req.session.progressiveBatchId = batchId;
+    const importedBy = req.user?._id?.toString() || req.user?.email || req.user?.name || "system";
 
-    const ops = mapped
-      .filter((m) => m.referenceNumber)
-      .map((m) => ({
-        updateOne: {
-          filter: { referenceNumber: m.referenceNumber, awbNumber: m.awbNumber || "" },
-          update: { $set: m },
-          upsert: true,
-        },
-      }));
+    const docs = [];
 
-    if (ops.length) await ProgressiveReport.bulkWrite(ops, { ordered: false });
+    for (let idx = 0; idx < mapped.length; idx++) {
+      const m = mapped[idx];
+      
+      // Add record_type and batch info to all records
+      const recordWithType = { 
+        ...m, 
+        record_type: 'progressive', 
+        import_batch_id: batchId, 
+        imported_by: importedBy, 
+        imported_at: new Date() 
+      };
+
+      docs.push(recordWithType);
+    }
+
+    console.log("[Progressive Import] Documents to insert:", docs.length);
+    if (docs.length > 0) {
+      console.log("[Progressive Import] First doc:", docs[0]);
+    }
+
+    let savedCount = 0;
+
+    // Insert all documents directly
+    if (docs.length > 0) {
+      try {
+        const result = await CardDelivery.insertMany(docs, { ordered: false });
+        savedCount = result.length;
+        console.log("[Progressive Import] insertMany successful. Inserted:", savedCount);
+      } catch (dbErr) {
+        console.error("[Progressive Import] insertMany error:", dbErr.message);
+        return res.status(500).send("Failed to save progressive report to database: " + dbErr.message);
+      }
+    }
+
+    if (savedCount === 0) {
+      console.warn("[Progressive Import] No records were saved");
+      return res.status(400).send("No valid records to import");
+    }
 
     await addAuditLog(req, {
       action_type: "IMPORT_PROGRESSIVE_REPORT",
       entity_type: "ProgressiveReport",
       entity_id: "BULK",
       source: "Progressive Report Import",
-      remarks: `Imported ${mapped.length} progressive report rows`,
+      remarks: `Imported ${savedCount} progressive report records`,
       import_batch_id: batchId,
     });
 
+    console.log("[Progressive Import] Redirecting to batch:", batchId);
     return res.redirect(`/deliveries/progressivereports?batch=${encodeURIComponent(batchId)}`);
   } catch (err) {
     console.error("Progressive import error:", err);
     return res.status(500).send("Failed to import progressive report.");
+  }
+});
+
+// GET /deliveries/progressivereports/export
+router.get("/progressivereports/export", async (req, res) => {
+  try {
+    const batchId = req.query.batchId || null;
+    const status = req.query.status || null;
+
+    const filter = { record_type: 'progressive' };
+    if (batchId) filter.import_batch_id = batchId;
+    if (status) filter.status = status;
+
+    const reports = await CardDelivery.find(filter).sort({ created_at: -1 }).lean();
+    if (reports.length === 0) return res.status(400).send("No progressive report data to export");
+
+    const exportData = reports.map((r) => ({
+      NO: r.number || "",
+      NAME: r.name || "",
+      PAN: r.pan || "",
+      ADDRESS1: r.address1 || "",
+      ADDRESS2: r.address2 || "",
+      ADDRESS3: r.address3 || "",
+      ADDRESS4: r.address4 || "",
+      CITY: r.city || "",
+      STATE: r.state || "",
+      COUNTRY: r.country || "",
+      ZIPCODE: r.zipCode || "",
+      "MOBILE NO": r.mobileNo || "",
+      PRODUCT: r.product || "",
+      "REFERENCE NUMBER": r.referenceNumber || "",
+      "FILE NAME": r.fileName || "",
+      "AWB NUMBER": r.awbNumber || "",
+      "DISPATCH DATE": r.dispatchDate ? new Date(r.dispatchDate).toLocaleDateString() : "",
+      "RECEIVED BY": r.receivedBy || "",
+      "RECEIVED DATE": r.receivedDate ? new Date(r.receivedDate).toLocaleDateString() : "",
+      PORT: r.port || "",
+      STATUS: r.status || "",
+      REMARKS: r.remarks || "",
+      Updated_At: r.updated_at ? new Date(r.updated_at).toISOString() : "-",
+    }));
+
+    const ws = xlsx.utils.json_to_sheet(exportData);
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, "Progressive");
+
+    const fileName = `progressive_report_${Date.now()}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    return res.send(xlsx.write(wb, { type: "buffer" }));
+  } catch (err) {
+    console.error("Error exporting progressive report data:", err);
+    return res.status(500).send("Error exporting progressive report data");
   }
 });
 
