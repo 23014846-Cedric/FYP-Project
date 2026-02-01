@@ -1926,4 +1926,148 @@ router.get("/progressivereports/export", async (req, res) => {
   }
 });
 
+// ==========================
+// DELETE ENDPOINTS
+// ==========================
+
+// DELETE /deliveries/:id/delete (main deliveries page)
+router.post("/:id/delete", async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+    const batchId = req.body.batchId;
+
+    console.log("[Deliveries Delete] Attempting to delete ID:", deliveryId, "BatchId:", batchId);
+
+    const delivery = await CardDelivery.findById(deliveryId).lean();
+    if (!delivery) {
+      console.warn("[Deliveries Delete] Record not found:", deliveryId);
+      return res.status(404).send("Record not found");
+    }
+
+    const result = await CardDelivery.findByIdAndDelete(deliveryId);
+    console.log("[Deliveries Delete] Delete result:", result);
+
+    await addAuditLog(req, {
+      action_type: "DELETE_DELIVERY",
+      entity_type: "CardDelivery",
+      entity_id: deliveryId,
+      source: "Deliveries Page",
+      remarks: `Deleted delivery: ${delivery.recipient_name} (${delivery.card_number || 'N/A'})`,
+      import_batch_id: batchId,
+    });
+
+    const redirectUrl = batchId ? `/deliveries?batchId=${encodeURIComponent(batchId)}` : "/deliveries";
+    console.log("[Deliveries Delete] Redirecting to:", redirectUrl);
+    return res.redirect(redirectUrl);
+  } catch (err) {
+    console.error("[Deliveries Delete] ERROR:", err.message, err.stack);
+    return res.status(500).send("Error deleting delivery: " + err.message);
+  }
+});
+
+// DELETE /deliveries/dispatchlist/:id/delete
+router.post("/dispatchlist/:id/delete", async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+    const batchId = req.body.batchId;
+
+    console.log("[Dispatch Delete] Attempting to delete ID:", deliveryId, "BatchId:", batchId);
+
+    const delivery = await CardDelivery.findById(deliveryId).lean();
+    if (!delivery) {
+      console.warn("[Dispatch Delete] Record not found:", deliveryId);
+      return res.status(404).send("Record not found");
+    }
+
+    const result = await CardDelivery.findByIdAndDelete(deliveryId);
+    console.log("[Dispatch Delete] Delete result:", result);
+
+    await addAuditLog(req, {
+      action_type: "DELETE_DISPATCH",
+      entity_type: "DispatchList",
+      entity_id: deliveryId,
+      source: "Dispatch List Page",
+      remarks: `Deleted dispatch record: ${delivery.name} (${delivery.referenceNumber || delivery.fileName || 'N/A'})`,
+      import_batch_id: batchId,
+    });
+
+    const redirectUrl = batchId ? `/deliveries/dispatchlist?batchId=${encodeURIComponent(batchId)}` : "/deliveries/dispatchlist";
+    console.log("[Dispatch Delete] Redirecting to:", redirectUrl);
+    return res.redirect(redirectUrl);
+  } catch (err) {
+    console.error("[Dispatch Delete] ERROR:", err.message, err.stack);
+    return res.status(500).send("Error deleting dispatch record: " + err.message);
+  }
+});
+
+// DELETE /deliveries/progressivereports/:id/delete
+router.post("/progressivereports/:id/delete", async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+    const batchId = req.body.batchId;
+
+    console.log("[Progressive Delete] Attempting to delete ID:", deliveryId, "BatchId:", batchId);
+
+    const report = await CardDelivery.findById(deliveryId).lean();
+    if (!report) {
+      console.warn("[Progressive Delete] Record not found:", deliveryId);
+      return res.status(404).send("Record not found");
+    }
+
+    const result = await CardDelivery.findByIdAndDelete(deliveryId);
+    console.log("[Progressive Delete] Delete result:", result);
+
+    await addAuditLog(req, {
+      action_type: "DELETE_PROGRESSIVE_REPORT",
+      entity_type: "ProgressiveReport",
+      entity_id: deliveryId,
+      source: "Progressive Report Page",
+      remarks: `Deleted progressive report: ${report.name} (${report.referenceNumber || report.fileName || 'N/A'})`,
+      import_batch_id: batchId,
+    });
+
+    const redirectUrl = batchId ? `/deliveries/progressivereports?batchId=${encodeURIComponent(batchId)}` : "/deliveries/progressivereports";
+    console.log("[Progressive Delete] Redirecting to:", redirectUrl);
+    return res.redirect(redirectUrl);
+  } catch (err) {
+    console.error("[Progressive Delete] ERROR:", err.message, err.stack);
+    return res.status(500).send("Error deleting progressive report: " + err.message);
+  }
+});
+
+// DELETE /deliveries/rts/:id/delete
+router.post("/rts/:id/delete", async (req, res) => {
+  try {
+    const deliveryId = req.params.id;
+    const batchId = req.body.batchId;
+
+    console.log("[RTS Delete] Attempting to delete ID:", deliveryId, "BatchId:", batchId);
+
+    const delivery = await CardDelivery.findById(deliveryId).lean();
+    if (!delivery) {
+      console.warn("[RTS Delete] Record not found:", deliveryId);
+      return res.status(404).send("Record not found");
+    }
+
+    const result = await CardDelivery.findByIdAndDelete(deliveryId);
+    console.log("[RTS Delete] Delete result:", result);
+
+    await addAuditLog(req, {
+      action_type: "DELETE_RTS_DELIVERY",
+      entity_type: "RTS",
+      entity_id: deliveryId,
+      source: "RTS Page",
+      remarks: `Deleted RTS record: ${delivery.cnee_name || delivery.recipient_name} (${delivery.rts_awb || 'N/A'})`,
+      import_batch_id: batchId,
+    });
+
+    const redirectUrl = batchId ? `/deliveries/rts?batchId=${encodeURIComponent(batchId)}` : "/deliveries/rts";
+    console.log("[RTS Delete] Redirecting to:", redirectUrl);
+    return res.redirect(redirectUrl);
+  } catch (err) {
+    console.error("[RTS Delete] ERROR:", err.message, err.stack);
+    return res.status(500).send("Error deleting RTS delivery: " + err.message);
+  }
+});
+
 module.exports = router;

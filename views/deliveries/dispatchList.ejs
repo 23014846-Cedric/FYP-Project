@@ -133,24 +133,31 @@
             <td><%= d.dispatchDate ? new Date(d.dispatchDate).toLocaleDateString() : 'nil' %></td>
 
             <td>
-              <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1">
-                <input type="hidden" name="batchId" value="<%= batchId || '' %>">
-                <select name="status" class="form-select form-select-sm">
-                  <option value="">-- Select Status --</option>
-                  <option value="Delivered"               <%= d.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
-                  <option value="Bad Address"             <%= d.status === 'Bad Address' ? 'selected' : '' %>>Bad Address</option>
-                  <option value="Consignee Not Around"    <%= d.status === 'Consignee Not Around' ? 'selected' : '' %>>Consignee Not Around</option>
-                  <option value="Denied Entry/Access"     <%= d.status === 'Denied Entry/Access' ? 'selected' : '' %>>Denied Entry/Access</option>
-                  <option value="Flooded Area"            <%= d.status === 'Flooded Area' ? 'selected' : '' %>>Flooded Area</option>
-                  <option value="Office Close"            <%= d.status === 'Office Close' ? 'selected' : '' %>>Office Close</option>
-                  <option value="Relocated"               <%= d.status === 'Relocated' ? 'selected' : '' %>>Relocated</option>
-                  <option value="Refuse to Accept"        <%= d.status === 'Refuse to Accept' ? 'selected' : '' %>>Refuse to Accept</option>
-                  <option value="Transfer"                <%= d.status === 'Transfer' ? 'selected' : '' %>>Transfer</option>
-                  <option value="Unlocated"               <%= d.status === 'Unlocated' ? 'selected' : '' %>>Unlocated</option>
-                </select>
+              <div class="d-flex gap-1">
+                <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1" style="flex: 1;">
+                  <input type="hidden" name="batchId" value="<%= batchId || '' %>">
+                  <select name="status" class="form-select form-select-sm">
+                    <option value="">-- Select Status --</option>
+                    <option value="Delivered"               <%= d.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
+                    <option value="Bad Address"             <%= d.status === 'Bad Address' ? 'selected' : '' %>>Bad Address</option>
+                    <option value="Consignee Not Around"    <%= d.status === 'Consignee Not Around' ? 'selected' : '' %>>Consignee Not Around</option>
+                    <option value="Denied Entry/Access"     <%= d.status === 'Denied Entry/Access' ? 'selected' : '' %>>Denied Entry/Access</option>
+                    <option value="Flooded Area"            <%= d.status === 'Flooded Area' ? 'selected' : '' %>>Flooded Area</option>
+                    <option value="Office Close"            <%= d.status === 'Office Close' ? 'selected' : '' %>>Office Close</option>
+                    <option value="Relocated"               <%= d.status === 'Relocated' ? 'selected' : '' %>>Relocated</option>
+                    <option value="Refuse to Accept"        <%= d.status === 'Refuse to Accept' ? 'selected' : '' %>>Refuse to Accept</option>
+                    <option value="Transfer"                <%= d.status === 'Transfer' ? 'selected' : '' %>>Transfer</option>
+                    <option value="Unlocated"               <%= d.status === 'Unlocated' ? 'selected' : '' %>>Unlocated</option>
+                  </select>
 
-                <button type="submit" class="btn btn-sm btn-primary">Save</button>
-              </form>
+                  <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                </form>
+
+                <form method="POST" action="/deliveries/dispatchlist/<%= d.id %>/delete" style="display: inline;" onsubmit="return confirmDelete('<%= d.name || 'Record' %>');">
+                  <input type="hidden" name="batchId" value="<%= batchId || '' %>">
+                  <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+              </div>
             </td>
           </tr>
         <% }) %>
@@ -255,6 +262,19 @@ function confirmImport(event) {
   }
   
   return true;
+}
+
+// Confirmation dialog for deletion
+function confirmDelete(recordName) {
+  const confirmed = confirm(
+    `WARNING: Delete Record\n\n` +
+    `Are you sure you want to permanently delete this record?\n` +
+    `Record: ${recordName}\n\n` +
+    `This action CANNOT be undone.\n\n` +
+    `Click OK to delete or Cancel to keep it.`
+  );
+  
+  return confirmed;
 }
 </script>
 
