@@ -30,6 +30,9 @@ const revealRouter = require("./routes/revealRouter");
 const auditApiRouter = require("./routes/auditApiRouter");
 const importBatchApiRouter = require("./routes/importBatchApiRouter");
 const courierRouter = require("./routes/courierRouter");
+const notificationRouter = require("./routes/notificationRouter");
+const { notifyRoles } = require("./utils/notificationService");
+
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -476,6 +479,44 @@ const topUsers = {
       statusVsExceptions,
 };
 
+// =======================
+// KPI ALERT: Exception Spike (Admin)
+// =======================
+const threshold = 20; // change to your preferred threshold
+
+// "Today" in Singapore time
+const now = new Date();
+const sgOffsetMs = 8 * 60 * 60 * 1000;
+const sgNow = new Date(now.getTime() + sgOffsetMs);
+const startOfSgDay = new Date(Date.UTC(
+  sgNow.getUTCFullYear(),
+  sgNow.getUTCMonth(),
+  sgNow.getUTCDate(),
+  0, 0, 0, 0
+));
+
+// Count exceptions updated today (recommended KPI signal)
+const exceptionsToday = await CardDelivery.countDocuments({
+  status: { $ne: "Delivered" },
+  updated_at: { $gte: startOfSgDay }
+});
+
+if (exceptionsToday >= threshold) {
+  await notifyRoles(["admin"], {
+    category: "KPI_ALERT",
+    severity: "warning",
+    title: "Exception spike detected",
+    message: "Failures today exceeded threshold.",
+    data: {
+      count: exceptionsToday,
+      threshold
+    },
+    link_url: "/auditLog?tab=graphs",
+    dedupe_key: `KPI_EXC_SPIKE::${startOfSgDay.toISOString().slice(0,10)}`,
+  }, { dedupeMinutes: 720 }); // 12 hours
+}
+
+
 
     // =======================
     // AUDIT PAGE STAT CARDS
@@ -604,6 +645,14 @@ const topUsers = {
 });
 
 // -------------------- ROUTER MOUNTING --------------------
+// Notifications routes (Admin / Operations)
+app.use(
+  "/notifications",
+  authMiddleware,
+  requireRole(["admin", "operations"]),
+  notificationRouter
+);
+
 
 // Courier routes (courier only)
 app.use("/courier", authMiddleware, requireRole(["courier"]), courierRouter);
@@ -678,6 +727,25 @@ app.use(
   requireRole('admin'),
   auditRouter
 );
+
+
+const { runSuspiciousNotifyJob } = require("./utils/suspiciousNotifyJob");
+
+let suspiciousJobRunning = false;
+
+setInterval(async () => {
+  if (suspiciousJobRunning) return;
+  suspiciousJobRunning = true;
+
+  try {
+    await runSuspiciousNotifyJob();
+  } catch (e) {
+    console.error("Suspicious notify job error:", e);
+  } finally {
+    suspiciousJobRunning = false;
+  }
+}, 15000); // every 15 seconds (you can change to 30000 or 60000)
+
 
 // -------------------- ERROR HANDLING (LAST) --------------------
 app.use(notFound);

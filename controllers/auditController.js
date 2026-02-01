@@ -1,6 +1,8 @@
 // controllers/auditController.js
 const AuditLog = require("../models/AuditLog");
 const { asyncHandler } = require("../utils/errorLogger");
+const { buildSuspiciousMap } = require("../utils/suspiciousDetection");
+
 
 function escapeRegex(input = "") {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -70,12 +72,32 @@ exports.getAuditLogs = asyncHandler(async (req, res) => {
       AuditLog.distinct("source"),
     ]);
 
+    // Detect suspicious patterns using a broader window (helps when pagination splits sequences)
+    const recentLogsForDetection = await AuditLog.find({
+      ...filter,
+    })
+      .sort({ timestamp: -1 })
+      .limit(500)
+      .lean();
+
+    // build map from bigger sample
+    const suspiciousAll = buildSuspiciousMap(recentLogsForDetection);
+
+    // use the map for your current page logs
+    const suspicious = {};
+    for (const l of logs) {
+      const key = String(l._id);
+      if (suspiciousAll[key]) suspicious[key] = suspiciousAll[key];
+    }
+
+
     const totalPages = Math.max(1, Math.ceil(total / limit));
     if (page > totalPages) page = totalPages;
 
     // ✅ IMPORTANT: pass everything the EJS uses
     return res.render("auditLog", {
       logs,
+      suspicious,
       total,
       page,
       limit,
