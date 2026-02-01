@@ -119,13 +119,91 @@ function buildAddress(row) {
   return parts.join(", ");
 }
 
+function pickStatus(row) {
+  // Try multiple common status column names - case-sensitive variations
+  let value = String(row["Status"] ?? "").trim();
+  console.log("[pickStatus] Checking 'Status' column:", value);
+  if (value) return value;
+
+  value = String(row["STATUS"] ?? "").trim();
+  console.log("[pickStatus] Checking 'STATUS' column:", value);
+  if (value) return value;
+
+  // Try uppercase variations
+  value = String(row["DELIVERY_STATUS"] ?? "").trim();
+  console.log("[pickStatus] Checking 'DELIVERY_STATUS' column:", value);
+  if (value) return value;
+
+  value = String(row["STATUS_UPDATE"] ?? "").trim();
+  console.log("[pickStatus] Checking STATUS_UPDATE column:", value);
+  if (value) return value;
+
+  console.log("[pickStatus] No status found in any column, returning empty string");
+  return "";
+}
+
 function mapFileStatusToAppStatus(fileStatus) {
   const s = toUpperTrim(fileStatus);
-  if (s === "DELIVERED") return "Delivered";
-  if (s === "IN TRANSIT") return "Handed to Courier";
-  if (s.includes("BAD") || s.includes("DOUBLE")) return "Not Found";
-  if (!s) return "Pending";
-  return "Pending";
+  console.log("[Courier Status Map] Input:", fileStatus, "Normalized:", s);
+  
+  // Direct mappings - exact matches
+  const statusMap = {
+    "DELIVERED": "Delivered",
+    "REPROCESSING": "PENDING",  // Reprocessing items treated as PENDING
+    "BAD ADDRESS": "Bad Address",
+    "CONSIGNEE NOT AROUND": "Consignee Not Around",
+    "DENIED ENTRY": "Denied Entry/Access",
+    "DENIED ENTRY/ACCESS": "Denied Entry/Access",
+    "FLOODED AREA": "Flooded Area",
+    "OFFICE CLOSE": "Office Close",
+    "OFFICE CLOSED": "Office Close",
+    "RELOCATED": "Relocated",
+    "REFUSE TO ACCEPT": "Refuse to Accept",
+    "REFUSE": "Refuse to Accept",
+    "TRANSFER": "Transfer",
+    "UNLOCATED": "Unlocated",
+    "RETURN TO CENTRE": "Return to Centre",
+    "RETURN TO CENTER": "Return to Centre",
+    "RETURN TO SENDER": "Return to Sender",
+    "NO UPDATES": "No Updates",
+    "IN TRANSIT": "IN TRANSIT",
+    "RETURNED": "RETURNED",
+    "FAILED": "FAILED",
+    "PENDING": "PENDING",
+  };
+
+  // Check for exact match first
+  if (statusMap[s]) {
+    console.log("[Courier Status Map] Mapped to:", statusMap[s], "(exact match)");
+    return statusMap[s];
+  }
+
+  // Check for partial matches (substring matching)
+  const partialMatches = {
+    "BAD ADDRESS": "Bad Address",
+    "CONSIGNEE": "Consignee Not Around",
+    "DENIED": "Denied Entry/Access",
+    "FLOODED": "Flooded Area",
+    "OFFICE": "Office Close",
+    "RELOCATED": "Relocated",
+    "REFUSE": "Refuse to Accept",
+    "TRANSFER": "Transfer",
+    "UNLOCATED": "Unlocated",
+    "RETURN": "Return to Sender",
+    "DELIVERED": "Delivered",
+    "PENDING": "PENDING"
+  };
+
+  for (const [keyword, status] of Object.entries(partialMatches)) {
+    if (s.includes(keyword)) {
+      console.log("[Courier Status Map] Mapped to:", status, "(partial match: " + keyword + ")");
+      return status;
+    }
+  }
+
+  // Default to PENDING if no match found
+  console.log("[Courier Status Map] No match found, defaulting to PENDING");
+  return "PENDING";
 }
 
 // ==========================
@@ -178,6 +256,12 @@ router.post("/deliveries/import", upload.single("excel_file"), async (req, res) 
 
     console.log("[Courier Import] Parsed rows:", rows.length);
 
+    // Debug: Print first row to see all columns
+    if (rows.length > 0) {
+      console.log("[Excel Debug] First row keys:", Object.keys(rows[0]));
+      console.log("[Excel Debug] First row values:", rows[0]);
+    }
+
     const docs = [];
     let invalidCount = 0;
 
@@ -193,7 +277,10 @@ router.post("/deliveries/import", upload.single("excel_file"), async (req, res) 
 
       // If your file has PORT / Courier info, else set to courier email
       const courier = String(row["PORT"] ?? "").trim() || req.user.email || "-";
-      const status = mapFileStatusToAppStatus(row["STATUS"]);
+      const pickedStatus = pickStatus(row);
+      const status = mapFileStatusToAppStatus(pickedStatus);
+
+      console.log(`[Courier Import] Row: ${card_number} | Name: ${recipient_name} | Picked Status: "${pickedStatus}" | Mapped Status: "${status}"`);
 
       docs.push({
         card_number,
