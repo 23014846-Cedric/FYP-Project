@@ -178,14 +178,80 @@ function pickCardNumber(row) {
 }
 
 function pickStatus(row) {
-  // Column O (index 14)
-  let value = String(row[14] ?? "").trim();
+  // Try multiple common status column names
+  let value = String(row["STATUS"] ?? "").trim();
   if (value) return value;
 
-  value = String(row["STATUS"] ?? "").trim();
+  // Column O (index 14)
+  value = String(row[14] ?? "").trim();
+  if (value) return value;
+
+  // Try uppercase variations
+  value = String(row["DELIVERY_STATUS"] ?? "").trim();
+  if (value) return value;
+
+  value = String(row["STATUS_UPDATE"] ?? "").trim();
   if (value) return value;
 
   return "";
+}
+
+function mapFileStatusToAppStatus(statusValue) {
+  if (!statusValue) return "Pending";
+
+  const status = String(statusValue).trim().toUpperCase();
+
+  // Direct mappings - exact matches
+  const statusMap = {
+    "DELIVERED": "Delivered",
+    "BAD ADDRESS": "Bad Address",
+    "CONSIGNEE NOT AROUND": "Consignee Not Around",
+    "DENIED ENTRY": "Denied Entry/Access",
+    "DENIED ENTRY/ACCESS": "Denied Entry/Access",
+    "FLOODED AREA": "Flooded Area",
+    "OFFICE CLOSE": "Office Close",
+    "OFFICE CLOSED": "Office Close",
+    "RELOCATED": "Relocated",
+    "REFUSE TO ACCEPT": "Refuse to Accept",
+    "REFUSE": "Refuse to Accept",
+    "TRANSFER": "Transfer",
+    "UNLOCATED": "Unlocated",
+    "RETURN TO CENTRE": "Return to Centre",
+    "RETURN TO CENTER": "Return to Centre",
+    "RETURN TO SENDER": "Return to Sender",
+    "NO UPDATES": "No Updates",
+    "PENDING": "Pending"
+  };
+
+  // Check for exact match first
+  if (statusMap[status]) {
+    return statusMap[status];
+  }
+
+  // Check for partial matches (substring matching)
+  const partialMatches = {
+    "BAD ADDRESS": "Bad Address",
+    "CONSIGNEE": "Consignee Not Around",
+    "DENIED": "Denied Entry/Access",
+    "FLOODED": "Flooded Area",
+    "OFFICE": "Office Close",
+    "RELOCATED": "Relocated",
+    "REFUSE": "Refuse to Accept",
+    "TRANSFER": "Transfer",
+    "UNLOCATED": "Unlocated",
+    "RETURN": "Return to Sender",
+    "DELIVERED": "Delivered",
+    "PENDING": "Pending"
+  };
+
+  for (const [keyword, mappedStatus] of Object.entries(partialMatches)) {
+    if (status.includes(keyword)) {
+      return mappedStatus;
+    }
+  }
+
+  // Default to Pending if no match found
+  return "Pending";
 }
 
 function validateProgressiveRow(row) {
@@ -194,7 +260,7 @@ function validateProgressiveRow(row) {
   if (!name) return false;
   if (nameUpper === "NAME" || nameUpper === "SHPR_NAME") return false;
 
-  const addressParts = [row["ADDRESS1"], row["ADDRESS2"], row["ADDRESS3"], row["ADDRESS4"], row["CITY"], row["ZIPCODE"]]
+  const addressParts = [row["ADDRESS1"], row["ADDRESS2"], row["ADDRESS3"], row["ADDRESS4"], row["CITY"], row["ZIP CODE"]]
     .map((v) => String(v ?? "").trim())
     .filter(Boolean);
 
@@ -210,16 +276,71 @@ function validateProgressiveRow(row) {
 }
 
 function buildAddress(row) {
-  const parts = [row["ADDRESS1"], row["ADDRESS2"], row["ADDRESS3"], row["ADDRESS4"], row["CITY"], row["ZIPCODE"]]
+  const parts = [row["ADDRESS1"], row["ADDRESS2"], row["ADDRESS3"], row["ADDRESS4"], row["CITY"], row["ZIP CODE"]]
     .map((v) => String(v ?? "").trim())
     .filter(Boolean);
   return parts.join(", ");
 }
 
-function mapFileStatusToAppStatus(fileStatus) {
-  const s = String(fileStatus ?? "").trim();
-  if (s) console.log(`[Import] Raw status value: "${s}"`);
-  return s || "";
+function mapRTSReasonToStatus(reasonValue) {
+  if (!reasonValue) return "Unlocated"; // Default status
+
+  const reason = String(reasonValue).trim().toUpperCase();
+
+  // Direct mappings - exact matches
+  const statusMap = {
+    "DELIVERED": "Delivered",
+    "BAD ADDRESS": "Bad Address",
+    "CONSIGNEE NOT AROUND": "Consignee Not Around",
+    "DENIED ENTRY": "Denied Entry/Access",
+    "DENIED ENTRY/ACCESS": "Denied Entry/Access",
+    "FLOODED AREA": "Flooded Area",
+    "OFFICE CLOSE": "Office Close",
+    "OFFICE CLOSED": "Office Close",
+    "RELOCATED": "Relocated",
+    "REFUSE TO ACCEPT": "Refuse to Accept",
+    "REFUSE": "Refuse to Accept",
+    "TRANSFER": "Transfer",
+    "UNLOCATED": "Unlocated",
+    "RETURN TO CENTRE": "Return to Centre",
+    "RETURN TO CENTER": "Return to Centre",
+    "RETURN TO SENDER": "Return to Sender",
+    "NO UPDATES": "No Updates",
+    "PENDING": "Pending"
+  };
+
+  // Check for exact match first
+  if (statusMap[reason]) {
+    console.log(`[RTS Status] Mapped "${reasonValue}" → "${statusMap[reason]}" (exact match)`);
+    return statusMap[reason];
+  }
+
+  // Check for partial matches (substring matching)
+  const partialMatches = {
+    "BAD ADDRESS": "Bad Address",
+    "CONSIGNEE": "Consignee Not Around",
+    "DENIED": "Denied Entry/Access",
+    "FLOODED": "Flooded Area",
+    "OFFICE": "Office Close",
+    "RELOCATED": "Relocated",
+    "REFUSE": "Refuse to Accept",
+    "TRANSFER": "Transfer",
+    "UNLOCATED": "Unlocated",
+    "RETURN": "Return to Sender",
+    "DELIVERED": "Delivered",
+    "PENDING": "Pending"
+  };
+
+  for (const [keyword, status] of Object.entries(partialMatches)) {
+    if (reason.includes(keyword)) {
+      console.log(`[RTS Status] Mapped "${reasonValue}" → "${status}" (partial match: ${keyword})`);
+      return status;
+    }
+  }
+
+  // No valid status found - log warning and default
+  console.log(`[RTS Status] Warning: Unknown status value "${reasonValue}" - defaulting to "Unlocated"`);
+  return "Unlocated";
 }
 
 // ==========================
@@ -231,21 +352,17 @@ router.get("/", async (req, res) => {
     const batchId = req.query.batchId || null;
     const status = req.query.status || null;
 
-    const filter = {};
+    const filter = { record_type: 'progressive' };
     if (batchId) filter.import_batch_id = batchId;
     if (status) filter.status = status;
 
-    let deliveries = [];
-    if (batchId || status) {
-      deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).lean();
-    } else {
-      deliveries = await CardDelivery.find({}).sort({ updated_at: -1 }).limit(100).lean();
-    }
+    // Always fetch deliveries from progressive record type (don't require batchId or status)
+    const deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).lean();
 
-    deliveries = deliveries.map((d) => ({ ...d, id: d._id.toString() }));
+    const mappedDeliveries = deliveries.map((d) => ({ ...d, id: d._id.toString() }));
 
     return res.render("deliveries/deliveries", {
-      deliveries,
+      deliveries: mappedDeliveries,
       batchId,
       selectedStatus: status,
     });
@@ -308,14 +425,18 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
     const rows = parseProgressiveReportRows(sheet);
 
     console.log("[Import] Parsed rows:", rows.length);
+    console.log("[Import] Starting import process. Batch ID:", batchId);
 
     const docs = [];
     let invalidCount = 0;
     let duplicateCount = 0;
     let updatedCount = 0;
+    let rowIndex = 0;
 
     for (const row of rows) {
+      rowIndex++;
       if (!validateProgressiveRow(row)) {
+        console.log(`[Import Row ${rowIndex}] Invalid row - skipped`);
         invalidCount++;
         continue;
       }
@@ -327,21 +448,39 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       const pickedStatus = pickStatus(row);
       const status = mapFileStatusToAppStatus(pickedStatus);
 
-      console.log(`[Import] Row: ${card_number} | Picked Status: "${pickedStatus}" | Mapped Status: "${status}"`);
+      console.log(`[Import Row ${rowIndex}] Card: ${card_number} | Recipient: ${recipient_name} | Picked Status: "${pickedStatus}" | Mapped Status: "${status}"`);
 
+      // Normalize fields for matching (case-insensitive, trimmed)
+      const normalizedCardNumber = card_number.toLowerCase().trim();
+      const normalizedRecipientName = recipient_name.toLowerCase().trim();
+      const normalizedAddress = address.toLowerCase().trim();
+
+      // Escape special regex characters
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Try to find existing delivery with normalized matching
+      // Search all record types to catch existing records regardless of type
+      console.log(`[Import Row ${rowIndex}] Searching DB for: "${normalizedCardNumber}" / "${normalizedRecipientName}" / "${normalizedAddress}"`);
+      
       const existingDelivery = await CardDelivery.findOne({
-        card_number,
-        recipient_name,
-        address,
+        card_number: { $regex: `^${escapeRegex(normalizedCardNumber)}$`, $options: 'i' },
+        recipient_name: { $regex: `^${escapeRegex(normalizedRecipientName)}$`, $options: 'i' },
+        address: { $regex: `^${escapeRegex(normalizedAddress)}$`, $options: 'i' },
       }).lean();
 
       if (existingDelivery) {
-        if (status && existingDelivery.status !== status) {
+        console.log(`[Import Row ${rowIndex}] ✓ FOUND existing record: ${existingDelivery._id} | Status: "${existingDelivery.status}"`);
+
+        // Check if status has actually changed
+        const statusChanged = status && status.trim() !== "" && existingDelivery.status !== status;
+        console.log(`[Import Row ${rowIndex}] Status changed: ${statusChanged} (File: "${status}" vs DB: "${existingDelivery.status}")`);
+
+        if (statusChanged) {
           console.log(
-            `[Import] Status change detected: ${card_number} - ${recipient_name} (${existingDelivery.status} → ${status})`
+            `[Import Row ${rowIndex}] ⚡ UPDATING status: ${existingDelivery.status} → ${status}`
           );
 
-          await CardDelivery.updateOne(
+          const updateResult = await CardDelivery.updateOne(
             { _id: existingDelivery._id },
             {
               $set: {
@@ -350,11 +489,13 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
                 import_batch_id: batchId,
                 imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
                 imported_at: new Date(),
+                record_type: 'progressive',
               },
             }
           );
 
           updatedCount++;
+          console.log(`[Import Row ${rowIndex}] ✓ UPDATED successfully. Modified count: ${updateResult.modifiedCount}`);
 
           await addAuditLog(req, {
             action_type: "UPDATE_DELIVERY_STATUS",
@@ -365,10 +506,12 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
             import_batch_id: batchId,
           });
         } else {
-          console.log(`[Import] Skipping duplicate: ${card_number} - ${recipient_name} (status: "${status}")`);
+          console.log(`[Import Row ${rowIndex}] SKIP: No status change (File: "${status}" = DB: "${existingDelivery.status}")`);
           duplicateCount++;
         }
         continue;
+      } else {
+        console.log(`[Import Row ${rowIndex}] NOT FOUND - will create new record`);
       }
 
       docs.push({
@@ -382,6 +525,7 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
         imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
         imported_at: new Date(),
         assigned_printer: assignedPrinterId,
+        record_type: 'progressive',
       });
     }
 
@@ -395,9 +539,13 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       result = await CardDelivery.insertMany(docs);
     }
 
-    console.log(
-      `[Import] Inserted ${result.length}. Invalid: ${invalidCount}. Duplicates: ${duplicateCount}. Updated: ${updatedCount}`
-    );
+    console.log("[Import] ═══════════════════════════════════════════");
+    console.log(`[Import] SUMMARY - Batch: ${batchId}`);
+    console.log(`[Import] ├─ Inserted: ${result.length} new records`);
+    console.log(`[Import] ├─ Invalid: ${invalidCount} rows`);
+    console.log(`[Import] ├─ Duplicates: ${duplicateCount} records (no status change)`);
+    console.log(`[Import] └─ Updated: ${updatedCount} records (status changed)`);
+    console.log("[Import] ═══════════════════════════════════════════");
 
     await addAuditLog(req, {
       action_type: "IMPORT_DELIVERIES",
@@ -629,10 +777,14 @@ function parseRTSReportRows(sheet) {
     }
   }
 
-  if (headerRowIndex === -1) return [];
+  if (headerRowIndex === -1) {
+    console.error("[RTS Import Parser] Could not find header row with CODE, RTS AWB, and CNEE_NAME");
+    return [];
+  }
 
   const headers = matrix[headerRowIndex].map((h) => String(h).trim().toUpperCase());
   console.log("[RTS Import Parser] Detected headers:", headers);
+  console.log("[RTS Import Parser] Total columns:", headers.length);
 
   const out = [];
   for (let r = headerRowIndex + 1; r < matrix.length; r++) {
@@ -641,7 +793,9 @@ function parseRTSReportRows(sheet) {
     if (!hasAny) continue;
 
     const obj = {};
+    // Store raw cell index for debugging
     for (let c = 0; c < row.length; c++) obj[c] = row[c];
+    // Map headers to their values
     for (let c = 0; c < headers.length; c++) {
       const key = headers[c];
       if (!key) continue;
@@ -650,39 +804,129 @@ function parseRTSReportRows(sheet) {
     out.push(obj);
   }
 
+  console.log(`[RTS Import Parser] Parsed ${out.length} data rows`);
   return out;
 }
 
 function validateRTSRow(row) {
+  // Get CNEE_NAME (consignee name) - required
   const name = String(row["CNEE_NAME"] || row["SHPR_NAME"] || "").trim();
-  if (!name) return false;
+  if (!name) {
+    console.log(`[RTS Validation] Rejected: Missing CNEE_NAME/SHPR_NAME`);
+    return false;
+  }
 
+  // Reject if it's just the header text
   const nameUpper = toUpperTrim(name);
-  if (nameUpper === "CNEE_NAME" || nameUpper === "SHPR_NAME") return false;
+  if (nameUpper === "CNEE_NAME" || nameUpper === "SHPR_NAME") {
+    console.log(`[RTS Validation] Rejected: Found header as data (${name})`);
+    return false;
+  }
 
+  // Get street address - required
   const street = String(row["CNEE_STREET"] || "").trim();
-  if (!street) return false;
+  if (!street) {
+    console.log(`[RTS Validation] Rejected: Missing CNEE_STREET`);
+    return false;
+  }
 
+  // Reject if it's just the header text
+  const streetUpper = toUpperTrim(street);
+  if (streetUpper === "CNEE_STREET" || streetUpper === "ADDRESS") {
+    console.log(`[RTS Validation] Rejected: Found header as data (${street})`);
+    return false;
+  }
+
+  // Get AWB number - required for card number fallback
   const awb = String(row["RTS AWB"] || "").trim();
-  if (!awb) return false;
+  if (!awb) {
+    console.log(`[RTS Validation] Rejected: Missing RTS AWB`);
+    return false;
+  }
+
+  // Reject if it's just the header text
+  const awbUpper = toUpperTrim(awb);
+  if (awbUpper === "RTS AWB" || awbUpper === "AWB") {
+    console.log(`[RTS Validation] Rejected: Found header as data (${awb})`);
+    return false;
+  }
+
+  // Validate status if present
+  const reasonOrStatus = String(row["REASON"] || row["STATUS"] || "").trim();
+  if (reasonOrStatus) {
+    const validStatuses = [
+      "Bad Address",
+      "Consignee Not Around",
+      "Denied Entry/Access",
+      "Flooded Area",
+      "Office Close",
+      "Relocated",
+      "Refuse to Accept",
+      "Transfer",
+      "Unlocated",
+      "Return to Centre",
+      "Return to Sender",
+      "No Updates",
+      "Delivered",
+      "Pending"
+    ];
+
+    // Check if any valid status keyword is in the value
+    const hasValidKeyword = validStatuses.some(s => 
+      reasonOrStatus.toLowerCase().includes(s.toLowerCase())
+    );
+    
+    if (!hasValidKeyword) {
+      console.log(`[RTS Validation] Warning: Unknown status "${reasonOrStatus}" - will default to "Unlocated"`);
+    }
+  }
 
   return true;
 }
 
 function buildRTSAddress(row) {
-  const parts = [row["CNEE_STREET"], row["CNEE_CITY"] || row["CITY"], row["CNEE_ZIP"] || row["ZIPCODE"]]
-    .map((v) => String(v ?? "").trim())
-    .filter(Boolean);
-  return parts.join(", ");
+  // Build address from multiple possible columns
+  const parts = [
+    String(row["CNEE_STREET"] || "").trim(),
+    String(row["CNEE_CITY"] || row["CITY"] || "").trim(),
+    String(row["CNEE_ZIP"] || row["ZIPCODE"] || "").trim()
+  ].filter(Boolean);
+
+  if (parts.length === 0) {
+    console.log(`[RTS Address] Warning: Could not build address from row`);
+    return "";
+  }
+
+  const address = parts.join(", ");
+  console.log(`[RTS Address] Built: ${address}`);
+  return address;
 }
 
 function pickRTSCardNumber(row) {
-  const code = cleanDigits(String(row["CODE"] || "").trim());
-  if (code.length === 16) return code;
+  // Try CODE column first (should be the card number)
+  const code = String(row["CODE"] || "").trim();
+  if (code) {
+    const cleanCode = cleanDigits(code);
+    if (cleanCode.length === 16) {
+      console.log(`[RTS Card] Found 16-digit card from CODE: ${cleanCode}`);
+      return cleanCode;
+    } else if (cleanCode.length > 0) {
+      console.log(`[RTS Card] Found ${cleanCode.length}-digit from CODE: ${cleanCode}`);
+      return cleanCode;
+    }
+  }
 
+  // Fallback to RTS AWB if available
   const awb = String(row["RTS AWB"] || "").trim();
-  if (cleanDigits(awb).length > 0) return awb;
+  if (awb) {
+    const cleanAwb = cleanDigits(awb);
+    if (cleanAwb.length > 0) {
+      console.log(`[RTS Card] Using RTS AWB as fallback: ${awb}`);
+      return awb;
+    }
+  }
 
+  console.log(`[RTS Card] Warning: Could not extract card number from CODE or RTS AWB`);
   return "";
 }
 
@@ -704,7 +948,7 @@ router.get("/rts", async (req, res) => {
       "Unlocated",
     ];
 
-    const filter = { status: { $in: RTS_STATUSES } };
+    const filter = { record_type: 'rts', status: { $in: RTS_STATUSES } };
     if (batchId) filter.import_batch_id = batchId;
     if (status) filter.status = status;
 
@@ -754,14 +998,33 @@ router.post("/rts/import", upload.single("excel_file"), async (req, res) => {
       }
 
       const card_number = pickRTSCardNumber(row);
+      if (!card_number) {
+        console.log(`[RTS Import] Skipping row: Could not extract card number`);
+        invalidCount++;
+        continue;
+      }
+
       const recipient_name = String(row["CNEE_NAME"] || row["SHPR_NAME"] || "").trim();
+      if (!recipient_name) {
+        console.log(`[RTS Import] Skipping row: No recipient name`);
+        invalidCount++;
+        continue;
+      }
+
       const address = buildRTSAddress(row);
+      if (!address) {
+        console.log(`[RTS Import] Skipping row: Could not build address`);
+        invalidCount++;
+        continue;
+      }
+
       const courier = String(row["DEST_PORT"] || "-").trim() || "-";
 
-      const reason = String(row["REASON"] || "").trim();
-      const status = mapRTSReasonToStatus(reason) || "Unlocated";
-
-      console.log(`[RTS Import] Row: ${card_number} | Reason: "${reason}" | Status: "${status}"`);
+      // Get the status from REASON column - use improved mapping
+      let rawReason = String(row["REASON"] || row["STATUS"] || row[14] || "").trim();
+      let status = mapRTSReasonToStatus(rawReason);
+      
+      console.log(`[RTS Import] Row: ${card_number} | Recipient: ${recipient_name} | Status: "${status}" | Raw: "${rawReason}"`);
 
       const existingDelivery = await CardDelivery.findOne({
         card_number,
@@ -782,6 +1045,7 @@ router.post("/rts/import", upload.single("excel_file"), async (req, res) => {
                 import_batch_id: batchId,
                 imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
                 imported_at: new Date(),
+                record_type: 'rts',
 
                 // RTS extra fields (only if your schema has them; harmless otherwise)
                 ship_name: String(row["SHPR_NAME"] || "").trim(),
@@ -793,7 +1057,7 @@ router.post("/rts/import", upload.single("excel_file"), async (req, res) => {
                 cnee_name: String(row["CNEE_NAME"] || "").trim(),
                 cnee_street: String(row["CNEE_STREET"] || "").trim(),
                 date_received: String(row["DATE_RECEIVED"] || "").trim(),
-                reason,
+                reason: rawReason,
                 remarks: String(row["REMARKS"] || "").trim(),
                 cnee_contact_no: String(row["CNEE_CONTACT_NO"] || "").trim(),
                 reference: String(row["REFERENCE"] || "").trim(),
@@ -830,6 +1094,7 @@ router.post("/rts/import", upload.single("excel_file"), async (req, res) => {
         imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
         imported_at: new Date(),
         assigned_printer: assignedPrinterId,
+        record_type: 'rts',
 
         // RTS extra fields (only if your schema has them; harmless otherwise)
         ship_name: String(row["SHPR_NAME"] || "").trim(),
@@ -841,7 +1106,7 @@ router.post("/rts/import", upload.single("excel_file"), async (req, res) => {
         cnee_name: String(row["CNEE_NAME"] || "").trim(),
         cnee_street: String(row["CNEE_STREET"] || "").trim(),
         date_received: String(row["DATE_RECEIVED"] || "").trim(),
-        reason,
+        reason: rawReason,
         remarks: String(row["REMARKS"] || "").trim(),
         cnee_contact_no: String(row["CNEE_CONTACT_NO"] || "").trim(),
         reference: String(row["REFERENCE"] || "").trim(),
@@ -1107,11 +1372,109 @@ router.post("/dispatchlist/import", upload.single("excel_file"), async (req, res
     console.log("[Dispatch Import] Batch ID:", batchId, "Imported by:", importedBy);
 
     const docs = [];
+    let duplicateCount = 0;
+    let updatedCount = 0;
+
+    console.log("[Dispatch Import] Starting duplicate check loop for", mapped.length, "rows");
 
     for (let idx = 0; idx < mapped.length; idx++) {
       const m = mapped[idx];
       
-      // Add record_type and batch info to all records
+      console.log(`[Dispatch Import] Row ${idx} - Checking duplicates:`, {
+        referenceNumber: m.referenceNumber,
+        fileName: m.fileName,
+        name: m.name,
+        address1: m.address1
+      });
+      
+      // Check for duplicates based on available unique identifiers
+      let existingRecord = null;
+      
+      // Prefer checking by referenceNumber if available
+      if (m.referenceNumber && String(m.referenceNumber).trim()) {
+        console.log(`[Dispatch Import] Row ${idx} - Checking by referenceNumber: "${m.referenceNumber}"`);
+        existingRecord = await CardDelivery.findOne({
+          record_type: "dispatch",
+          referenceNumber: m.referenceNumber,
+        }).lean();
+        if (existingRecord) {
+          console.log(`[Dispatch Import] Row ${idx} - Found duplicate by referenceNumber`);
+        }
+      }
+      
+      // If not found and fileName is available, check by fileName
+      if (!existingRecord && m.fileName && String(m.fileName).trim()) {
+        console.log(`[Dispatch Import] Row ${idx} - Checking by fileName: "${m.fileName}"`);
+        existingRecord = await CardDelivery.findOne({
+          record_type: "dispatch",
+          fileName: m.fileName,
+        }).lean();
+        if (existingRecord) {
+          console.log(`[Dispatch Import] Row ${idx} - Found duplicate by fileName`);
+        }
+      }
+      
+      // As last resort, check by name and address combination (dispatch list specific)
+      if (!existingRecord && m.name && String(m.name).trim() && m.address1 && String(m.address1).trim()) {
+        console.log(`[Dispatch Import] Row ${idx} - Checking by name & address1: "${m.name}" + "${m.address1}"`);
+        existingRecord = await CardDelivery.findOne({
+          record_type: "dispatch",
+          name: m.name,
+          address1: m.address1,
+        }).lean();
+        if (existingRecord) {
+          console.log(`[Dispatch Import] Row ${idx} - Found duplicate by name & address1`);
+        }
+      }
+
+      if (existingRecord) {
+        // Record already exists, check if status changed
+        console.log(`[Dispatch Import] Row ${idx} - Found existing record: ${existingRecord._id}`);
+        console.log(`[Dispatch Import] Row ${idx} - Current status: "${existingRecord.status}" | New status: "${m.status}"`);
+        
+        // Check if status has changed
+        const statusChanged = m.status && m.status.trim() !== "" && existingRecord.status !== m.status;
+        
+        if (statusChanged) {
+          console.log(`[Dispatch Import] Row ${idx} - STATUS CHANGED: "${existingRecord.status}" → "${m.status}"`);
+          
+          await CardDelivery.updateOne(
+            { _id: existingRecord._id },
+            {
+              $set: {
+                status: m.status,
+                import_batch_id: batchId,
+                imported_by: importedBy,
+                imported_at: new Date(),
+              },
+            }
+          );
+          
+          console.log(`[Dispatch Import] Row ${idx} - ✓ Status updated successfully`);
+          updatedCount++;
+        } else {
+          // No status change, just update batch ID so it shows in current import session
+          console.log(`[Dispatch Import] Row ${idx} - No status change, updating batch ID only`);
+          
+          await CardDelivery.updateOne(
+            { _id: existingRecord._id },
+            {
+              $set: {
+                import_batch_id: batchId,
+                imported_by: importedBy,
+                imported_at: new Date(),
+              },
+            }
+          );
+          
+          updatedCount++;
+        }
+        continue;
+      }
+      
+      console.log(`[Dispatch Import] Row ${idx} - No duplicate found, will insert`);
+
+      // Add record_type and batch info
       const recordWithType = { 
         ...m, 
         record_type: 'dispatch', 
@@ -1123,7 +1486,7 @@ router.post("/dispatchlist/import", upload.single("excel_file"), async (req, res
       docs.push(recordWithType);
     }
 
-    console.log("[Dispatch Import] Documents to insert:", docs.length);
+    console.log("[Dispatch Import] Documents to insert:", docs.length, "Duplicates skipped:", duplicateCount);
     if (docs.length > 0) {
       console.log("[Dispatch Import] First doc:", docs[0]);
     }
@@ -1142,10 +1505,10 @@ router.post("/dispatchlist/import", upload.single("excel_file"), async (req, res
         return res.status(500).send("Failed to save dispatch list to database: " + dbErr.message);
       }
     } else {
-      console.warn("[Dispatch Import] No documents to insert");
+      console.warn("[Dispatch Import] No new documents to insert");
     }
 
-    if (savedCount === 0) {
+    if (savedCount === 0 && updatedCount === 0) {
       console.warn("[Dispatch Import] No records were saved");
       return res.status(400).send("No valid records to import");
     }
@@ -1336,11 +1699,109 @@ router.post("/progressivereports/import", upload.single("excel_file"), async (re
     const importedBy = req.user?._id?.toString() || req.user?.email || req.user?.name || "system";
 
     const docs = [];
+    let duplicateCount = 0;
+    let updatedCount = 0;
+
+    console.log("[Progressive Import] Starting duplicate check loop for", mapped.length, "rows");
 
     for (let idx = 0; idx < mapped.length; idx++) {
       const m = mapped[idx];
       
-      // Add record_type and batch info to all records
+      console.log(`[Progressive Import] Row ${idx} - Checking duplicates:`, {
+        referenceNumber: m.referenceNumber,
+        fileName: m.fileName,
+        name: m.name,
+        address1: m.address1
+      });
+      
+      // Check for duplicates based on available unique identifiers
+      let existingRecord = null;
+      
+      // Prefer checking by referenceNumber if available
+      if (m.referenceNumber && String(m.referenceNumber).trim()) {
+        console.log(`[Progressive Import] Row ${idx} - Checking by referenceNumber: "${m.referenceNumber}"`);
+        existingRecord = await CardDelivery.findOne({
+          record_type: "progressive",
+          referenceNumber: m.referenceNumber,
+        }).lean();
+        if (existingRecord) {
+          console.log(`[Progressive Import] Row ${idx} - Found duplicate by referenceNumber`);
+        }
+      }
+      
+      // If not found and fileName is available, check by fileName
+      if (!existingRecord && m.fileName && String(m.fileName).trim()) {
+        console.log(`[Progressive Import] Row ${idx} - Checking by fileName: "${m.fileName}"`);
+        existingRecord = await CardDelivery.findOne({
+          record_type: "progressive",
+          fileName: m.fileName,
+        }).lean();
+        if (existingRecord) {
+          console.log(`[Progressive Import] Row ${idx} - Found duplicate by fileName`);
+        }
+      }
+      
+      // As last resort, check by name and address combination (progressive report specific)
+      if (!existingRecord && m.name && String(m.name).trim() && m.address1 && String(m.address1).trim()) {
+        console.log(`[Progressive Import] Row ${idx} - Checking by name & address1: "${m.name}" + "${m.address1}"`);
+        existingRecord = await CardDelivery.findOne({
+          record_type: "progressive",
+          name: m.name,
+          address1: m.address1,
+        }).lean();
+        if (existingRecord) {
+          console.log(`[Progressive Import] Row ${idx} - Found duplicate by name & address1`);
+        }
+      }
+
+      if (existingRecord) {
+        // Record already exists, check if status changed
+        console.log(`[Progressive Import] Row ${idx} - Found existing record: ${existingRecord._id}`);
+        console.log(`[Progressive Import] Row ${idx} - Current status: "${existingRecord.status}" | New status: "${m.status}"`);
+        
+        // Check if status has changed
+        const statusChanged = m.status && m.status.trim() !== "" && existingRecord.status !== m.status;
+        
+        if (statusChanged) {
+          console.log(`[Progressive Import] Row ${idx} -  STATUS CHANGED: "${existingRecord.status}" → "${m.status}"`);
+          
+          await CardDelivery.updateOne(
+            { _id: existingRecord._id },
+            {
+              $set: {
+                status: m.status,
+                import_batch_id: batchId,
+                imported_by: importedBy,
+                imported_at: new Date(),
+              },
+            }
+          );
+          
+          console.log(`[Progressive Import] Row ${idx} - ✓ Status updated successfully`);
+          updatedCount++;
+        } else {
+          // No status change, just update batch ID so it shows in current import session
+          console.log(`[Progressive Import] Row ${idx} - No status change, updating batch ID only`);
+          
+          await CardDelivery.updateOne(
+            { _id: existingRecord._id },
+            {
+              $set: {
+                import_batch_id: batchId,
+                imported_by: importedBy,
+                imported_at: new Date(),
+              },
+            }
+          );
+          
+          updatedCount++;
+        }
+        continue;
+      }
+      
+      console.log(`[Progressive Import] Row ${idx} - No duplicate found, will insert`);
+
+      // Add record_type and batch info
       const recordWithType = { 
         ...m, 
         record_type: 'progressive', 
@@ -1352,7 +1813,7 @@ router.post("/progressivereports/import", upload.single("excel_file"), async (re
       docs.push(recordWithType);
     }
 
-    console.log("[Progressive Import] Documents to insert:", docs.length);
+    console.log("[Progressive Import] Documents to insert:", docs.length, "Duplicates skipped:", duplicateCount);
     if (docs.length > 0) {
       console.log("[Progressive Import] First doc:", docs[0]);
     }
@@ -1371,7 +1832,7 @@ router.post("/progressivereports/import", upload.single("excel_file"), async (re
       }
     }
 
-    if (savedCount === 0) {
+    if (savedCount === 0 && updatedCount === 0) {
       console.warn("[Progressive Import] No records were saved");
       return res.status(400).send("No valid records to import");
     }
