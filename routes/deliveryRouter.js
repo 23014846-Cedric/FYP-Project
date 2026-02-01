@@ -352,11 +352,11 @@ router.get("/", async (req, res) => {
     const batchId = req.query.batchId || null;
     const status = req.query.status || null;
 
-    const filter = { record_type: 'progressive' };
+    const filter = { record_type: 'card' };
     if (batchId) filter.import_batch_id = batchId;
     if (status) filter.status = status;
 
-    // Always fetch deliveries from progressive record type (don't require batchId or status)
+    // Always fetch deliveries from card record type (don't require batchId or status)
     const deliveries = await CardDelivery.find(filter).sort({ updated_at: -1 }).lean();
 
     const mappedDeliveries = deliveries.map((d) => ({ ...d, id: d._id.toString() }));
@@ -489,7 +489,7 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
                 import_batch_id: batchId,
                 imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
                 imported_at: new Date(),
-                record_type: 'progressive',
+                record_type: 'card',
               },
             }
           );
@@ -515,6 +515,7 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
       }
 
       docs.push({
+        // Basic delivery fields
         card_number,
         recipient_name,
         address,
@@ -525,7 +526,25 @@ router.post("/import", upload.single("excel_file"), async (req, res) => {
         imported_by: req.user?._id?.toString() || req.user?.email || req.user?.name || "system",
         imported_at: new Date(),
         assigned_printer: assignedPrinterId,
-        record_type: 'progressive',
+        record_type: 'card',
+        
+        // Progressive Report specific fields - map from Excel columns
+        number: parseInt(row["NO."] || 0) || 0,
+        name: String(row["NAME"] ?? "").trim(),
+        pan: String(row["PAN"] ?? "").trim(),
+        address1: String(row["ADDRESS1"] ?? "").trim(),
+        address2: String(row["ADDRESS2"] ?? "").trim(),
+        address3: String(row["ADDRESS3"] ?? "").trim(),
+        address4: String(row["ADDRESS4"] ?? "").trim(),
+        city: String(row["CITY"] ?? "").trim(),
+        zipCode: String(row["ZIP CODE"] ?? "").trim(),
+        mobileNo: String(row["MOBILE NO."] ?? "").trim(),
+        product: String(row["PRODUCT"] ?? "").trim(),
+        referenceNumber: String(row["REFERENCE NUMBER"] ?? "").trim(),
+        fileName: String(row["FILE NAME"] ?? "").trim(),
+        awbNumber: String(row["AWB NUMBER (Original)"] ?? "").trim(),
+        port: String(row["PORT"] ?? "-").trim() || "-",
+        receivedBy: String(row["RECEIVED BY"] ?? "").trim(),
       });
     }
 
