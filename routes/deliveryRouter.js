@@ -14,6 +14,9 @@ const CardDelivery = require("../models/CardDelivery");
 const DispatchList = require("../models/DispatchList");
 const ProgressiveReport = require("../models/ProgressiveReport");
 
+const { notifyRoles } = require("../utils/notificationService");
+
+
 // Multer: temp upload folder
 const upload = multer({ dest: "uploads/" });
 
@@ -461,6 +464,125 @@ router.post("/:id/status", async (req, res) => {
       new_value: new_status,
       source: "Deliveries Page",
     });
+
+    // ==========================
+    // NOTIFICATIONS (Ops + Admin)
+    // ==========================
+    const EXCEPTION_STATUSES = [
+      "Bad Address",
+      "Consignee Not Around",
+      "Denied Entry/Access",
+      "Flooded Area",
+      "Office Close",
+      "Relocated",
+      "Refuse to Accept",
+      "Transfer",
+      "Unlocated",
+      "Return to Centre",
+      "Return to Sender",
+      "No Updates",
+    ];
+
+    //Delivery Exception / Failed Delivery (Ops + Admin) — “from exceptions page”
+    if (EXCEPTION_STATUSES.includes(new_status) && new_status !== "Delivered") {
+      const NEXT_STEP_BY_STATUS = {
+        "Bad Address": "Verify address with customer / update records / schedule reattempt",
+        "Consignee Not Around": "Contact customer / schedule delivery reattempt",
+        "Denied Entry/Access": "Confirm access requirements / reschedule delivery",
+        "Flooded Area": "Delay delivery and monitor conditions / reschedule later",
+        "Office Close": "Confirm operating hours / reattempt next working day",
+        "Relocated": "Verify new address / update delivery details",
+        "Refuse to Accept": "Confirm refusal reason / escalate to issuer",
+        "Transfer": "Track transfer process / confirm next handler",
+        "Unlocated": "Verify location details / contact customer",
+        "Return to Centre": "Confirm return handling / decide next action",
+        "Return to Sender": "Notify sender / close delivery loop",
+        "No Updates": "Investigate delivery progress / contact courier",
+      };
+
+    const recommendedNextStep =
+      NEXT_STEP_BY_STATUS[new_status] || "Review exception and take appropriate action";
+
+
+      await notifyRoles(["operations", "admin"], {
+        category: "EXCEPTION_ALERT",
+        severity: "warning",
+        title: "Delivery exception / failed delivery",
+        message: "A delivery moved into an exception status and requires follow-up.",
+        data: {
+          deliveryId: deliveryId,
+          exceptionType: new_status,            // matches your system statuses
+          reasonCode: "STATUS_EXCEPTION",
+          shortNote: "Logged by status update",
+          currentStatus: new_status,
+          recommendedNextStep,
+        },
+        link_url: "/exceptions",
+        dedupe_key: `EXC::${deliveryId}::${new_status}`,
+      });
+    }
+
+    //Status Updated by Another Role (Ops)
+    if (req.user?.role && req.user.role !== "operations") {
+      await notifyRoles(["operations"], {
+        category: "STATUS_ROLE_ALERT",
+        severity: "info",
+        title: "Status updated by another role",
+        message: "A delivery status was updated by a non-operations role.",
+        data: {
+          deliveryId: deliveryId,
+          oldStatus: oldStatus,
+          newStatus: new_status,
+          updatedByRole: req.user.role, // role only
+        },
+        link_url: "", // per your requirement
+        dedupe_key: `ROLE_STATUS::${deliveryId}::${oldStatus}::${new_status}::${req.user.role}`,
+      }, { dedupeMinutes: 5 });
+    }
+
+
+    // ================================
+    // NOTIFY ADMIN: Sensitive field change
+    // ================================
+    try {
+      const sensitiveFields = [
+        "address",
+        "postal",
+        "zipcode",
+        "zip",
+        "unit",
+        "block",
+        "contact",
+        "phone",
+        "email",
+      ];
+    
+      // 🔑 THIS MUST MATCH what you pass into addAuditLog
+      const changedField = "status"; // OR req.body.fieldName if dynamic
+    
+      const isSensitive = sensitiveFields.some(k =>
+        changedField.toLowerCase().includes(k)
+      );
+    
+      if (isSensitive) {
+        await notifyRoles(["admin"], {
+          category: "SENSITIVE_FIELD_CHANGE",
+          severity: "warning",
+          title: "Sensitive field change",
+          message: "A sensitive delivery field was edited.",
+          data: {
+            deliveryId,
+            fieldChanged: changedField,
+            changedBy: req.user?.role || "unknown",
+          },
+          link_url: `/auditLog?q=${encodeURIComponent(deliveryId)}`,
+          dedupe_key: `ADMIN_SENSITIVE::${deliveryId}::${changedField}::${req.user?.role}`,
+        }, { dedupeMinutes: 30 });
+      }
+    } catch (e) {
+      console.error("Admin sensitive change notification failed:", e);
+    }
+    
 
     const redirectBatch = batchId || existing?.import_batch_id;
     return res.redirect(redirectBatch ? `/deliveries?batchId=${encodeURIComponent(redirectBatch)}` : "/deliveries");
