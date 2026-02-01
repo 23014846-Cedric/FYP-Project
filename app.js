@@ -32,7 +32,7 @@ const importBatchApiRouter = require("./routes/importBatchApiRouter");
 const courierRouter = require("./routes/courierRouter");
 const notificationRouter = require("./routes/notificationRouter");
 const { notifyRoles } = require("./utils/notificationService");
-
+const overviewRouter = require("./routes/overviewRouter");
 
 // Middleware
 const authMiddleware = require('./middleware/authMiddleware');
@@ -156,43 +156,48 @@ app.get("/errorDiagnostics", authMiddleware, async (req, res) => {
   }
 });
 
-
-// Protected dashboard (any logged-in user)
-// Protected dashboard
-// Protected dashboard (any logged-in user)
+// -------------------- DASHBOARD (NO DELIVERY RECORDS SEGMENT) --------------------
 app.get("/dashboard", authMiddleware, async (req, res) => {
   try {
     if (!req.user || !["admin", "operations", "printer"].includes(req.user.role)) {
       return res.status(403).send("Access denied");
     }
 
-    // Pagination
-    const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-    const limit = 10;
-    const skip = (page - 1) * limit;
-
-    // Role-based filter (keep consistent with what user can see)
+    // Role-based filter
+    // admin/operations: see all
+    // printer: see only assigned to them
     const filter =
-  (req.user.role === "admin" || req.user.role === "operations")
-    ? {}
-    : { assigned_printer: req.user._id };
+      req.user.role === "admin" || req.user.role === "operations"
+        ? {}
+        : { assigned_printer: req.user._id };
 
+    // Total records for this role scope
     const total = await CardDelivery.countDocuments(filter);
-    const totalPages = Math.max(Math.ceil(total / limit), 1);
 
-    const deliveries = await CardDelivery.find(filter)
-      .sort({ updated_at: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    // Status list from schema enum (auto-updates if you change CardDelivery.STATUS later)
-    const statusList = CardDelivery.schema.path("status").enumValues || [
-      "Pending",
-      "Shipped",
-      "Delivered",
-      "Failed",
-    ];
+    // Status list (prefer schema enum; fallback to fixed list)
+    const enumValues = CardDelivery.schema.path("status")?.enumValues || [];
+    const statusList =
+      enumValues.length > 0
+        ? enumValues
+        : [
+            "Delivered",
+            "Bad Address",
+            "Consignee Not Around",
+            "Denied Entry/Access",
+            "Flooded Area",
+            "Office Close",
+            "Relocated",
+            "Refuse to Accept",
+            "Transfer",
+            "Unlocated",
+            "Return to Centre",
+            "Return to Sender",
+            "No Updates",
+            "PENDING",
+            "IN TRANSIT",
+            "RETURNED",
+            "FAILED",
+          ];
 
     // Count each status in ONE query
     const grouped = await CardDelivery.aggregate([
@@ -205,35 +210,48 @@ app.get("/dashboard", authMiddleware, async (req, res) => {
       if (row && row._id) statsByStatus[row._id] = row.count;
     }
 
-    // Keep your existing chart stats too
+    // Stats aligned to your charts
     const stats = {
       total,
       delivered: statsByStatus["Delivered"] || 0,
-      inTransit: statsByStatus["Shipped"] || 0,
-      exceptions: Math.max(total - (statsByStatus["Delivered"] || 0), 0),
+      inTransit: statsByStatus["IN TRANSIT"] || 0,
+      exceptions: (statsByStatus["FAILED"] || 0) + (statsByStatus["RETURNED"] || 0),
     };
 
     return res.render("dashboard", {
       user: req.user,
-      deliveries,
       stats,
       statusList,
       statsByStatus,
-      page,
-      totalPages,
     });
   } catch (err) {
     console.error("Error loading dashboard:", err);
 
-    const fallbackStatuses = ["Pending", "Shipped", "Delivered", "Failed"];
+    const fallbackStatuses = [
+      "Delivered",
+      "Bad Address",
+      "Consignee Not Around",
+      "Denied Entry/Access",
+      "Flooded Area",
+      "Office Close",
+      "Relocated",
+      "Refuse to Accept",
+      "Transfer",
+      "Unlocated",
+      "Return to Centre",
+      "Return to Sender",
+      "No Updates",
+      "PENDING",
+      "IN TRANSIT",
+      "RETURNED",
+      "FAILED",
+    ];
+
     return res.render("dashboard", {
       user: req.user,
-      deliveries: [],
       stats: { total: 0, delivered: 0, inTransit: 0, exceptions: 0 },
       statusList: fallbackStatuses,
       statsByStatus: Object.fromEntries(fallbackStatuses.map((s) => [s, 0])),
-      page: 1,
-      totalPages: 1,
     });
   }
 });
@@ -719,6 +737,12 @@ app.use(
   exceptionRouter
 );
 
+app.use(
+  "/deliveries",
+  authMiddleware,
+  requireRole(["admin", "operations"]),
+  overviewRouter
+);
 
 // Audit Log – Admin only
 app.use(

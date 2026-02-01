@@ -4,42 +4,23 @@
   <meta charset="UTF-8">
   <title>Dashboard</title>
 
-  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
   <style>
-    body {
-      background: linear-gradient(to right, #0d6efd, #4dabf7);
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+    body { background: linear-gradient(to right, #0d6efd, #4dabf7); min-height: 100vh; overflow-x: hidden; }
 
-    /* Keeps dashboard aligned next to sidebar */
-    .content-container {
-      margin-left: 240px;   /* match sidebar width */
-      padding: 40px 24px;
-      min-height: 100vh;
-    }
-    @media (max-width: 992px) {
-      .content-container {
-        margin-left: 0;
-        padding: 28px 16px;
-      }
-    }
+    .content-container { margin-left: 240px; padding: 40px 24px; min-height: 100vh; }
+    @media (max-width: 992px) { .content-container { margin-left: 0; padding: 28px 16px; } }
 
     .card-box {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
+      background: white; border-radius: 12px; padding: 20px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.15);
       transition: transform 0.15s ease;
     }
     .card-box:hover { transform: translateY(-4px); }
 
-    .stat-number { font-size: 2rem; font-weight: 800; line-height: 1; }
-
     .table th { white-space: nowrap; }
-    /* Status cards */
+
     .status-card {
       background: rgba(255,255,255,0.95);
       border: 1px solid rgba(15,23,42,0.08);
@@ -50,59 +31,17 @@
       position: relative;
       overflow: hidden;
     }
-
     .status-card:hover {
       transform: translateY(-5px);
       box-shadow: 0 16px 36px rgba(0,0,0,0.14);
       border-color: rgba(13,110,253,0.25);
     }
 
-    .status-topbar {
-      position: absolute;
-      top: 0;
-      left: 0;
-      height: 6px;
-      width: 100%;
-      opacity: 0.9;
-    }
-
-    .status-name {
-      font-size: 0.92rem;
-      font-weight: 700;
-      letter-spacing: 0.2px;
-      color: #0f172a;
-      margin: 2px 0 10px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .status-count {
-      font-size: 2.15rem;
-      font-weight: 900;
-      line-height: 1;
-      color: #0f172a;
-      margin: 0;
-    }
-
-    .status-meta {
-      margin-top: 10px;
-      font-size: 0.82rem;
-      color: rgba(15,23,42,0.55);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .status-pill {
-      font-size: 0.72rem;
-      font-weight: 700;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(13,110,253,0.08);
-      color: rgba(13,110,253,1);
-      border: 1px solid rgba(13,110,253,0.18);
-    }
+    .status-topbar { position: absolute; top: 0; left: 0; height: 6px; width: 100%; opacity: 0.9; }
+    .status-name { font-size: 0.92rem; font-weight: 700; color: #0f172a; margin: 2px 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .status-count { font-size: 2.15rem; font-weight: 900; line-height: 1; color: #0f172a; margin: 0; }
+    .status-meta { margin-top: 10px; font-size: 0.82rem; color: rgba(15,23,42,0.55); display: flex; justify-content: space-between; align-items: center; }
+    .status-pill { font-size: 0.72rem; font-weight: 700; padding: 6px 10px; border-radius: 999px; background: rgba(13,110,253,0.08); color: rgba(13,110,253,1); border: 1px solid rgba(13,110,253,0.18); }
   </style>
 </head>
 
@@ -113,32 +52,38 @@
 
   <main class="content-container">
 
-    <!-- Welcome text -->
     <div class="text-white mb-4">
       <h2 class="mb-1">Welcome, <%= user ? user.name : "Guest" %></h2>
       <small class="opacity-75">Role: <strong><%= user ? user.role : "N/A" %></strong></small>
     </div>
 
-    <!-- Stats Row (Clickable) -->
     <div class="row g-3">
-      <% 
+      <%
         const colorMap = {
           "Delivered": "linear-gradient(90deg, #198754, #20c997)",
-          "Pending": "linear-gradient(90deg, #0d6efd, #4dabf7)",
-          "Handed to Courier": "linear-gradient(90deg, #6f42c1, #b197fc)",
-          "Reprocessing": "linear-gradient(90deg, #fd7e14, #ffc107)",
-          "Failed": "linear-gradient(90deg, #dc3545, #ff6b6b)",
-          "Pulled Out": "linear-gradient(90deg, #495057, #adb5bd)",
-          "Not Found": "linear-gradient(90deg, #495057, #adb5bd)",
-          "Returned to Printer": "linear-gradient(90deg, #0dcaf0, #66d9e8)",
-          "Destroyed": "linear-gradient(90deg, #212529, #495057)",
-          "Shipped": "linear-gradient(90deg, #0dcaf0, #66d9e8)"
+          "PENDING": "linear-gradient(90deg, #0d6efd, #4dabf7)",
+          "IN TRANSIT": "linear-gradient(90deg, #0dcaf0, #66d9e8)",
+          "RETURNED": "linear-gradient(90deg, #6c757d, #adb5bd)",
+          "FAILED": "linear-gradient(90deg, #dc3545, #ff6b6b)",
+
+          "Bad Address": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Consignee Not Around": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Denied Entry/Access": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Flooded Area": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Office Close": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Relocated": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Refuse to Accept": "linear-gradient(90deg, #fd7e14, #ffc107)",
+          "Transfer": "linear-gradient(90deg, #6f42c1, #b197fc)",
+          "Unlocated": "linear-gradient(90deg, #6f42c1, #b197fc)",
+          "Return to Centre": "linear-gradient(90deg, #6c757d, #adb5bd)",
+          "Return to Sender": "linear-gradient(90deg, #6c757d, #adb5bd)",
+          "No Updates": "linear-gradient(90deg, #495057, #adb5bd)",
         };
       %>
 
-      <% (statusList || []).forEach(s => { 
-          const count = (statsByStatus && statsByStatus[s]) ? statsByStatus[s] : 0;
-          const bar = colorMap[s] || "linear-gradient(90deg, #0d6efd, #4dabf7)";
+      <% (statusList || []).forEach(s => {
+        const count = (statsByStatus && statsByStatus[s]) ? statsByStatus[s] : 0;
+        const bar = colorMap[s] || "linear-gradient(90deg, #0d6efd, #4dabf7)";
       %>
         <div class="col-12 col-sm-6 col-lg-3">
           <a href="/deliveries?status=<%= encodeURIComponent(s) %>" class="text-decoration-none">
@@ -162,7 +107,6 @@
       <% }) %>
     </div>
 
-    <!-- Charts Row -->
     <div class="row g-3 mt-4">
       <div class="col-12 col-lg-6">
         <div class="card-box">
@@ -179,180 +123,11 @@
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="card-box mt-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <h4 class="mb-0">Delivery Records</h4>
+    <!-- ✅ Delivery Records segment removed completely -->
 
-        <div class="d-flex gap-2">
-          <!-- Printer peek button -->
-          <% if (user && user.role === "printer") { %>
-            <button class="btn btn-sm btn-outline-dark"
-                    data-bs-toggle="modal"
-                    data-bs-target="#revealModal">
-              👁 Peek
-            </button>
-
-            <% if (typeof canRevealSensitive !== 'undefined' && canRevealSensitive) { %>
-              <button class="btn btn-sm btn-outline-warning" id="btnHideSensitive">
-                Hide
-              </button>
-            <% } %>
-          <% } %>
-
-        </div>
-      </div>
-
-      <div class="table-responsive">
-        <table class="table table-bordered table-hover align-middle bg-white mb-0">
-          <thead class="table-light text-center">
-            <tr>
-              <th style="min-width:140px;">Card #</th>
-              <th style="min-width:140px;">Recipient</th>
-              <th style="min-width:260px;">Address</th>
-              <th style="min-width:100px;">Courier</th>
-              <th style="min-width:120px;">Status</th>
-              <th style="min-width:180px;">Updated At</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <% if (deliveries && deliveries.length > 0) { %>
-              <% deliveries.forEach(d => { %>
-                <tr class="
-                    <%= d.status === 'Delivered' ? 'table-success'
-                      : d.status === 'Shipped' ? 'table-warning'
-                      : d.status === 'Failed' ? 'table-danger'
-                      : '' %>"
-                >
-                  <!-- Card Number -->
-                  <td class="text-center fw-semibold">
-                    <% const revealAllowed = (user && (user.role === "admin" || user.role === "operations")) || (typeof canRevealSensitive !== 'undefined' && canRevealSensitive); %>
-                    <% if (revealAllowed) { %>
-                      <%= d.card_number %>
-                    <% } else { %>
-                      <%= maskCard(d.card_number) %>
-                    <% } %>
-                  </td>
-
-                  <td><%= d.recipient_name %></td>
-
-                  <!-- Address -->
-                  <td>
-                    <% if (revealAllowed) { %>
-                      <%= d.address %>
-                    <% } else { %>
-                      <%= maskAddress(d.address) %>
-                    <% } %>
-                  </td>
-
-                  <td class="text-center"><%= d.courier || '-' %></td>
-
-                  <td class="text-center fw-bold">
-                    <span class="badge
-                      <%= d.status === 'Delivered' ? 'bg-success'
-                        : d.status === 'Shipped' ? 'bg-warning text-dark'
-                        : d.status === 'Failed' ? 'bg-danger'
-                        : 'bg-secondary' %>">
-                      <%= d.status %>
-                    </span>
-                  </td>
-
-                  <td class="text-center text-muted">
-                    <% if (d.updated_at) { %>
-                      <%= new Date(d.updated_at).toISOString().slice(0,19).replace('T',' ') %>
-                    <% } else { %>
-                      -
-                    <% } %>
-                  </td>
-                </tr>
-              <% }) %>
-            <% } else { %>
-              <tr>
-                <td colspan="6" class="text-center text-muted py-4">
-                  No delivery records found.
-                </td>
-              </tr>
-            <% } %>
-          </tbody>
-        </table>
-      </div>
-      <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
-        <nav class="mt-3" aria-label="Deliveries pagination">
-          <ul class="pagination pagination-sm justify-content-end mb-0">
-
-            <!-- Prev -->
-            <li class="page-item <%= (page <= 1 ? 'disabled' : '') %>">
-              <a class="page-link" href="?page=<%= Math.max(1, page - 1) %>">Prev</a>
-            </li>
-
-            <!-- Page numbers (compact) -->
-            <% 
-              const start = Math.max(1, page - 2);
-              const end = Math.min(totalPages, page + 2);
-            %>
-
-            <% if (start > 1) { %>
-              <li class="page-item"><a class="page-link" href="?page=1">1</a></li>
-              <% if (start > 2) { %>
-                <li class="page-item disabled"><span class="page-link">…</span></li>
-              <% } %>
-            <% } %>
-
-            <% for (let p = start; p <= end; p++) { %>
-              <li class="page-item <%= (p === page ? 'active' : '') %>">
-                <a class="page-link" href="?page=<%= p %>"><%= p %></a>
-              </li>
-            <% } %>
-
-            <% if (end < totalPages) { %>
-              <% if (end < totalPages - 1) { %>
-                <li class="page-item disabled"><span class="page-link">…</span></li>
-              <% } %>
-              <li class="page-item"><a class="page-link" href="?page=<%= totalPages %>"><%= totalPages %></a></li>
-            <% } %>
-
-            <!-- Next -->
-            <li class="page-item <%= (page >= totalPages ? 'disabled' : '') %>">
-              <a class="page-link" href="?page=<%= Math.min(totalPages, page + 1) %>">Next</a>
-            </li>
-
-          </ul>
-        </nav>
-      <% } %>
-    </div>
   </main>
 
-  <!-- Peek modal (Printer only) -->
-  <% if (user && user.role === "printer") { %>
-    <div class="modal fade" id="revealModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Admin Password Required</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-
-          <div class="modal-body">
-            <p class="text-muted mb-2">
-              Enter admin password to temporarily reveal full card number and full address.
-            </p>
-            <input id="adminPassword" type="password" class="form-control" placeholder="Admin password">
-            <div id="revealError" class="text-danger small mt-2 d-none"></div>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button class="btn btn-primary" id="btnRevealConfirm">Confirm</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  <% } %>
-
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Bootstrap JS (needed for modal) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <script>
@@ -367,7 +142,7 @@
       const pieCtx = document.getElementById('pieIncompleteChart').getContext('2d');
       new Chart(pieCtx, {
         type: 'pie',
-        data: { labels: ['Delivered', 'Incomplete'], datasets: [{ data: [delivered, incomplete] }] },
+        data: { labels: ['Delivered', 'Not Delivered'], datasets: [{ data: [delivered, incomplete] }] },
         options: { plugins: { legend: { position: 'bottom' } } }
       });
 
@@ -375,50 +150,13 @@
       new Chart(barCtx, {
         type: 'bar',
         data: {
-          labels: ['Delivered', 'In Transit', 'Exceptions'],
+          labels: ['Delivered', 'IN TRANSIT', 'FAILED+RETURNED'],
           datasets: [{ label: 'Number of Deliveries', data: [delivered, inTransit, exceptions] }]
         },
         options: {
           scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
           plugins: { legend: { display: false } }
         }
-      });
-    }
-
-    // Printer peek flow
-    const btnRevealConfirm = document.getElementById("btnRevealConfirm");
-    const adminPasswordEl = document.getElementById("adminPassword");
-    const revealError = document.getElementById("revealError");
-
-    if (btnRevealConfirm) {
-      btnRevealConfirm.addEventListener("click", async () => {
-        revealError?.classList.add("d-none");
-        const adminPassword = adminPasswordEl?.value?.trim();
-
-        const res = await fetch("/reveal/request", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ adminPassword })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          if (revealError) {
-            revealError.textContent = data.error || "Invalid password.";
-            revealError.classList.remove("d-none");
-          }
-          return;
-        }
-
-        window.location.reload();
-      });
-    }
-
-    const btnHideSensitive = document.getElementById("btnHideSensitive");
-    if (btnHideSensitive) {
-      btnHideSensitive.addEventListener("click", async () => {
-        await fetch("/reveal/clear", { method: "POST" });
-        window.location.reload();
       });
     }
   </script>

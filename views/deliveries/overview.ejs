@@ -1,0 +1,221 @@
+<!-- views/deliveries/overview.ejs (FULL)
+     4 columns side-by-side: deliveries, dispatchList, progressiveReport, rts
+-->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Deliveries Overview</title>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background: #f6f7fb; }
+    .col-card {
+      background: white;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      height: calc(100vh - 140px);
+      display: flex;
+      flex-direction: column;
+    }
+    .col-card .card-header {
+      background: #0d6efd;
+      color: white;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .table-wrap { overflow: auto; }
+    th { white-space: nowrap; }
+    td { vertical-align: middle; }
+    .mini { font-size: 12px; color: rgba(255,255,255,0.85); }
+    .sticky-head thead th { position: sticky; top: 0; z-index: 2; }
+  </style>
+</head>
+
+<body class="p-3">
+  <%- include("../partials/navbar") %>
+  <div class="sidebar-hover-zone"></div>
+  <%- include("../partials/sidebar") %>
+
+  <div class="container-fluid mt-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+      <div>
+        <h3 class="mb-0">Deliveries Overview</h3>
+        <div class="text-muted small">
+          Showing all 4 record types side-by-side
+        </div>
+      </div>
+      <div class="text-muted small">
+        Logged in as: <strong><%= user?.name || "Unknown" %></strong> (<%= user?.role || "N/A" %>)
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- 1) Deliveries -->
+      <div class="col-12 col-xl-3">
+        <div class="col-card">
+          <div class="card-header py-2 px-3">
+            <div>
+              Deliveries
+              <div class="mini">record_type: card</div>
+            </div>
+            <span class="badge bg-light text-dark"><%= counts.deliveries %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-sm table-striped mb-0 sticky-head">
+              <thead class="table-light">
+                <tr>
+                  <th>Card #</th>
+                  <th>Recipient</th>
+                  <th>Status</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!deliveries || deliveries.length === 0) { %>
+                  <tr><td colspan="4" class="text-center text-muted py-3">No records</td></tr>
+                <% } else { %>
+                  <% deliveries.forEach(d => { %>
+                    <tr>
+                      <td><%= d.card_number || "-" %></td>
+                      <td><%= d.recipient_name || "-" %></td>
+                      <td><span class="badge bg-info text-dark"><%= d.status || "-" %></span></td>
+                      <td class="text-muted">
+                        <%= d.updated_at ? new Date(d.updated_at).toISOString().slice(0,19).replace("T"," ") : "-" %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2) Dispatch List -->
+      <div class="col-12 col-xl-3">
+        <div class="col-card">
+          <div class="card-header py-2 px-3">
+            <div>
+              Dispatch List
+              <div class="mini">record_type: dispatch</div>
+            </div>
+            <span class="badge bg-light text-dark"><%= counts.dispatches %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-sm table-striped mb-0 sticky-head">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>Ref #</th>
+                  <th>AWB</th>
+                  <th>Dispatch Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!dispatches || dispatches.length === 0) { %>
+                  <tr><td colspan="4" class="text-center text-muted py-3">No records</td></tr>
+                <% } else { %>
+                  <% dispatches.forEach(d => { %>
+                    <tr>
+                      <td><%= d.name || "-" %></td>
+                      <td><%= d.referenceNumber || "-" %></td>
+                      <td><%= d.awbNumber || "-" %></td>
+                      <td class="text-muted">
+                        <%= d.dispatchDate ? new Date(d.dispatchDate).toLocaleDateString() : "-" %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3) Progressive Report -->
+      <div class="col-12 col-xl-3">
+        <div class="col-card">
+          <div class="card-header py-2 px-3">
+            <div>
+              Progressive Report
+              <div class="mini">record_type: progressive</div>
+            </div>
+            <span class="badge bg-light text-dark"><%= counts.reports %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-sm table-striped mb-0 sticky-head">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>AWB</th>
+                  <th>Status</th>
+                  <th>Port</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!reports || reports.length === 0) { %>
+                  <tr><td colspan="4" class="text-center text-muted py-3">No records</td></tr>
+                <% } else { %>
+                  <% reports.forEach(r => { %>
+                    <tr>
+                      <td><%= r.name || "-" %></td>
+                      <td><%= r.awbNumber || "-" %></td>
+                      <td><span class="badge bg-info text-dark"><%= r.status || "-" %></span></td>
+                      <td><%= r.port || "-" %></td>
+                    </tr>
+                  <% }) %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4) RTS -->
+      <div class="col-12 col-xl-3">
+        <div class="col-card">
+          <div class="card-header py-2 px-3">
+            <div>
+              RTS
+              <div class="mini">record_type: rts</div>
+            </div>
+            <span class="badge bg-light text-dark"><%= counts.rts %></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-sm table-striped mb-0 sticky-head">
+              <thead class="table-light">
+                <tr>
+                  <th>RTS AWB</th>
+                  <th>Consignee</th>
+                  <th>Status</th>
+                  <th>Dest</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!rts || rts.length === 0) { %>
+                  <tr><td colspan="4" class="text-center text-muted py-3">No records</td></tr>
+                <% } else { %>
+                  <% rts.forEach(x => { %>
+                    <tr>
+                      <td><%= x.rts_awb || "-" %></td>
+                      <td><%= x.cnee_name || x.recipient_name || "-" %></td>
+                      <td><span class="badge bg-warning text-dark"><%= x.status || "-" %></span></td>
+                      <td><%= x.dest_port || x.courier || "-" %></td>
+                    </tr>
+                  <% }) %>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <%- include("../partials/footer") %>
+</body>
+</html>
