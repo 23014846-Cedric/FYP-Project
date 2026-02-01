@@ -100,21 +100,27 @@
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Status</label>
-                <select class="form-select" name="status" id="statusInput"><option>Pending</option>
-                  <option>Bad Address</option>
-                  <option>Consignee Not Around</option>
-                  <option>Denied Entry/Access</option>
-                  <option>Flooded Area</option>
-                  <option>Office Close</option>
-                  <option>Relocated</option>
-                  <option>Refuse to Accept</option>
-                  <option>Transfer</option>
-                  <option>Unlocated</option>
-                  <option>Return to Centre</option>
-                  <option>Return to Sender</option>
-                  <option>No Updates</option>
-                </select>
+              <select class="form-select" name="status" id="statusInput" required>
+                <option value="PENDING" selected>PENDING</option>
+                <option value="IN TRANSIT">IN TRANSIT</option>
+                <option value="Delivered">Delivered</option>
+
+                <option value="Bad Address">Bad Address</option>
+                <option value="Consignee Not Around">Consignee Not Around</option>
+                <option value="Denied Entry/Access">Denied Entry/Access</option>
+                <option value="Flooded Area">Flooded Area</option>
+                <option value="Office Close">Office Close</option>
+                <option value="Relocated">Relocated</option>
+                <option value="Refuse to Accept">Refuse to Accept</option>
+                <option value="Transfer">Transfer</option>
+                <option value="Unlocated">Unlocated</option>
+                <option value="Return to Centre">Return to Centre</option>
+                <option value="Return to Sender">Return to Sender</option>
+                <option value="No Updates">No Updates</option>
+
+                <option value="RETURNED">RETURNED</option>
+                <option value="FAILED">FAILED</option>
+              </select>
             </div>
 
             </div>

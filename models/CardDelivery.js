@@ -2,26 +2,52 @@
 const mongoose = require("mongoose");
 
 const STATUS = [
-  "Delivered","Bad Address","Consignee Not Around","Denied Entry/Access",
-  "Flooded Area","Office Close","Relocated","Refuse to Accept",
-  "Transfer","Unlocated","Return to Centre","Return to Sender",
-  "No Updates","PENDING","IN TRANSIT","RETURNED","FAILED"
+  "Delivered",
+  "Bad Address",
+  "Consignee Not Around",
+  "Denied Entry/Access",
+  "Flooded Area",
+  "Office Close",
+  "Relocated",
+  "Refuse to Accept",
+  "Transfer",
+  "Unlocated",
+  "Return to Centre",
+  "Return to Sender",
+  "No Updates",
+  "PENDING",
+  "IN TRANSIT",
+  "RETURNED",
+  "FAILED",
 ];
 
 const cardDeliverySchema = new mongoose.Schema(
   {
     // Record type: card, rts, dispatch, or progressive
-    record_type: { type: String, enum: ['card', 'rts', 'dispatch', 'progressive'], default: 'card', index: true },
+    record_type: {
+      type: String,
+      enum: ["card", "rts", "dispatch", "progressive"],
+      default: "card",
+      index: true,
+    },
 
     // Basic card delivery fields
     card_number: { type: String, trim: true },
     recipient_name: { type: String, trim: true },
     address: { type: String, trim: true },
     courier: { type: String, trim: true, default: "-" },
-    status: { type: String, default: "Pending", index: true },
+
+    // ✅ enforce your allowed statuses
+    status: { type: String, enum: STATUS, default: "PENDING", index: true },
+
     updated_at: { type: Date, default: Date.now },
-    
-    assigned_printer: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
+
+    assigned_printer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
 
     import_batch_id: { type: String, index: true },
     imported_by: { type: String }, // user id/email/name
@@ -47,7 +73,7 @@ const cardDeliverySchema = new mongoose.Schema(
     // Dispatch List & Progressive Report fields
     number: { type: Number, default: 0 },
     no: { type: Number, default: 0 },
-    
+
     name: { type: String, trim: true },
     pan: { type: String, default: "", trim: true },
 
@@ -79,6 +105,9 @@ const cardDeliverySchema = new mongoose.Schema(
     timestamps: { createdAt: "created_at", updatedAt: false },
   }
 );
+
+// Optional: expose statuses to other parts of app if needed
+cardDeliverySchema.statics.STATUS = STATUS;
 
 // Indexes for performance
 cardDeliverySchema.index({ card_number: 1, recipient_name: 1, address: 1 });
