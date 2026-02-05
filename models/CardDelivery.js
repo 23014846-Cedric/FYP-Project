@@ -120,4 +120,4 @@ cardDeliverySchema.index({ record_type: 1, import_batch_id: 1 });
 // Prevent model overwrite in dev (nodemon)
 module.exports =
   mongoose.models.CardDelivery ||
-  mongoose.model("CardDelivery", cardDeliverySchema);
+  mongoose.model("CardDelivery", cardDeliverySchema, "courierdeliveries");
