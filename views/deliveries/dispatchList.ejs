@@ -133,26 +133,6 @@
             <td><%= d.dispatchDate ? new Date(d.dispatchDate).toLocaleDateString() : 'nil' %></td>
 
             <td>
-              <div class="d-flex gap-1">
-                <form method="POST" action="/deliveries/<%= d.id %>/status" class="d-flex gap-1" style="flex: 1;">
-                  <input type="hidden" name="batchId" value="<%= batchId || '' %>">
-                  <select name="status" class="form-select form-select-sm">
-                    <option value="">-- Select Status --</option>
-                    <option value="Delivered"               <%= d.status === 'Delivered' ? 'selected' : '' %>>Delivered</option>
-                    <option value="Bad Address"             <%= d.status === 'Bad Address' ? 'selected' : '' %>>Bad Address</option>
-                    <option value="Consignee Not Around"    <%= d.status === 'Consignee Not Around' ? 'selected' : '' %>>Consignee Not Around</option>
-                    <option value="Denied Entry/Access"     <%= d.status === 'Denied Entry/Access' ? 'selected' : '' %>>Denied Entry/Access</option>
-                    <option value="Flooded Area"            <%= d.status === 'Flooded Area' ? 'selected' : '' %>>Flooded Area</option>
-                    <option value="Office Close"            <%= d.status === 'Office Close' ? 'selected' : '' %>>Office Close</option>
-                    <option value="Relocated"               <%= d.status === 'Relocated' ? 'selected' : '' %>>Relocated</option>
-                    <option value="Refuse to Accept"        <%= d.status === 'Refuse to Accept' ? 'selected' : '' %>>Refuse to Accept</option>
-                    <option value="Transfer"                <%= d.status === 'Transfer' ? 'selected' : '' %>>Transfer</option>
-                    <option value="Unlocated"               <%= d.status === 'Unlocated' ? 'selected' : '' %>>Unlocated</option>
-                  </select>
-
-                  <button type="submit" class="btn btn-sm btn-primary">Save</button>
-                </form>
-
                 <form method="POST" action="/deliveries/dispatchlist/<%= d.id %>/delete" style="display: inline;" onsubmit="return confirmDelete('<%= d.name || 'Record' %>');">
                   <input type="hidden" name="batchId" value="<%= batchId || '' %>">
                   <button type="submit" class="btn btn-sm btn-danger">Delete</button>
